@@ -14,7 +14,7 @@ export const REPUTABLE_YOUTUBE_FALLBACKS: Record<MusicGenre, string> = {
 };
 
 export const buildEmbedUrl = (videoId: string): string => {
-  return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&playlist=${videoId}&loop=1&enablejsapi=1`;
+  return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&playlist=${videoId}&enablejsapi=1`;
 };
 
 export const getFallbackVideoId = (genre: MusicGenre): string => {

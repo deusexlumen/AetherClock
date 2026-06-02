@@ -32,7 +32,7 @@ export const generateVoiceBriefing = async (
   }
 
   if (config.includeTime) {
-    parts.push(`Es ist ${alarmTime}.`);
+    parts.push(`It is ${alarmTime}.`);
   }
 
   if (config.includeWeather && weather) {
@@ -44,14 +44,14 @@ export const generateVoiceBriefing = async (
     const activeItems = agenda.filter(i => i.active).slice(0, 3);
     if (activeItems.length > 0) {
       const itemTexts = activeItems.map(i => `${i.time} ${i.title}`).join(', ');
-      parts.push(`Deine nächsten Termine: ${itemTexts}.`);
+      parts.push(`Your upcoming appointments: ${itemTexts}.`);
     }
   }
 
   const text = parts.join(' ');
 
   const response = await ai.models.generateContent({
-    model: MODEL_TTS,
+    model: llmConfig?.ttsModel || DEFAULT_TTS_MODEL,
     contents: [{ parts: [{ text }] }],
     config: {
       responseModalities: [Modality.AUDIO],

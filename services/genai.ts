@@ -3,6 +3,7 @@ import { WeatherData, WEATHER_CODES, MusicGenre, SearchedSongMetadata, LLMConfig
 
 // Default models (can be overridden via config)
 const DEFAULT_MODEL_TEXT = "gemini-3.5-flash";
+const DEFAULT_MODEL_TTS = "gemini-3.1-flash-tts-preview";
 const MODEL_ID_FULL = "lyria-3-pro-preview"; // Full song (public preview name)
 
 export interface SongResult {
@@ -163,7 +164,7 @@ export const generateSong = async (prompt: string, onProgress?: (msg: string) =>
   console.log(`[GenAI] ── Song Generation Start ──`);
   console.log(`[GenAI] API Key: ${keyPreview}`);
   console.log(`[GenAI] Primary Model: ${MODEL_ID_FULL}`);
-  console.log(`[GenAI] Fallback Model: ${MODEL_TTS}`);
+  console.log(`[GenAI] Fallback Model: ${DEFAULT_MODEL_TTS}`);
   console.log(`[GenAI] Prompt (first 200 chars): ${prompt.substring(0, 200)}`);
 
   if (onProgress) onProgress("Initializing Lyria model session...");
@@ -252,7 +253,7 @@ export const generateSong = async (prompt: string, onProgress?: (msg: string) =>
   }
 
   // Attempt 2: Fallback to TTS (Gemini 3.1 Flash TTS is extremely natural)
-  console.log(`[GenAI] ── Fallback: trying ${MODEL_TTS} ──`);
+  console.log(`[GenAI] ── Fallback: trying ${DEFAULT_MODEL_TTS} ──`);
   if (onProgress) onProgress("Engaging backup vocal synthesis...");
   
   try {
@@ -266,7 +267,7 @@ export const generateSong = async (prompt: string, onProgress?: (msg: string) =>
     });
 
     const ttsResponse = await ai.models.generateContent({
-      model: MODEL_TTS,
+      model: DEFAULT_MODEL_TTS,
       contents: [{ 
         parts: [{ 
           text: `Say: Here is your personalized daily update song. ${prompt}` 

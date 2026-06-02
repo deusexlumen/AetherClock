@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Clock } from './components/Clock';
 import { Visualizer } from './components/Visualizer';
 import { PlaylistViewer } from './components/PlaylistViewer';
-import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig } from './types';
+import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig } from './types';
 import { fetchWeather } from './services/weather';
 import { 
   registerServiceWorker, 
@@ -18,6 +18,7 @@ import { generateMusicalPrompt, generateSong } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
 import { generatePlaylist, buildEmbedUrl, getFallbackVideoId } from './services/playlist';
+import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
   Power, 
   Play, 
@@ -434,28 +435,28 @@ const App: React.FC = () => {
       ctx.resume();
     }
 
-    // Only create source if not already connected
-    if (!sourceNodeRef.current || sourceNodeRef.current.mediaElement !== audioElement) {
-      try {
-        sourceNodeRef.current = ctx.createMediaElementSource(audioElement);
-        analyserRef.current = ctx.createAnalyser();
-        analyserRef.current.fftSize = 256;
-        analyserRef.current.smoothingTimeConstant = 0.85;
-        sourceNodeRef.current.connect(analyserRef.current);
-        analyserRef.current.connect(ctx.destination);
-      } catch (err) {
-        // Already connected or cross-origin issue
-        console.warn('[Audio] Could not connect visualizer:', err);
-      }
+    // Only create source if not already connected to this element
+    if (sourceNodeRef.current?.mediaElement === audioElement) {
+      return; // Already connected
+    }
+
+    try {
+      sourceNodeRef.current = ctx.createMediaElementSource(audioElement);
+      analyserRef.current = ctx.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      analyserRef.current.smoothingTimeConstant = 0.85;
+      sourceNodeRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(ctx.destination);
+    } catch (err) {
+      // Already connected or cross-origin issue
+      console.warn('[Audio] Could not connect visualizer:', err);
     }
   };
 
-  // Refs for stable alarm-check callbacks
-  const handleGenerateAndPlayRef = useRef(handleGenerateAndPlay);
-  const startPlaybackSequenceRef = useRef(startPlaybackSequence);
-  handleGenerateAndPlayRef.current = handleGenerateAndPlay;
-  startPlaybackSequenceRef.current = startPlaybackSequence;
-
+  // Refs for stable alarm-check callbacks (initialized with dummies to avoid TDZ)
+  const handleGenerateAndPlayRef = useRef<any>(() => {});
+  const startPlaybackSequenceRef = useRef<any>(() => {});
+  const handleNextTrackRef = useRef<any>(() => {});
   // Dual-Planner Tabs
   const [plannerTab, setPlannerTab] = useState<'interactive' | 'textarea'>('interactive');
   
@@ -604,7 +605,7 @@ const App: React.FC = () => {
             setState(prev => ({ ...prev, status: 'playing', isAlarmActive: false }));
             playOfflineFallback();
             if (notificationsEnabled) {
-              sendAlarmNotification('Lyria Radio Alarm', 'Wake up! Playing offline fallback alarm.');
+              sendAlarmNotification('AetherClock Alarm', 'Wake up! Playing offline fallback alarm.');
             }
             return;
          }
@@ -612,12 +613,12 @@ const App: React.FC = () => {
          if (isPreWarmEnabled && state.status === 'ready') {
             setState(prev => ({ ...prev, isAlarmActive: false }));
             if (notificationsEnabled) {
-              sendAlarmNotification('Lyria Radio Alarm', 'Your personalized broadcast is starting.');
+              sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
             }
             startPlaybackSequenceRef.current();
          } else if (state.status === 'idle') {
             if (notificationsEnabled) {
-              sendAlarmNotification('Lyria Radio Alarm', 'Generating your broadcast now...');
+              sendAlarmNotification('AetherClock', 'Generating your broadcast now...');
             }
             handleGenerateAndPlayRef.current(false);
          }
@@ -715,7 +716,7 @@ const App: React.FC = () => {
           const fallbackId = getFallbackVideoId(state.genrePreset);
           playlist.push({
             title: 'Radio Fallback',
-            artist: 'Lyria Radio',
+            artist: 'AetherClock',
             youtubeVideoId: fallbackId,
             whyExplanation: 'Fallback track for continuous playback'
           });
@@ -840,6 +841,11 @@ const App: React.FC = () => {
     }));
   };
 
+  // Sync refs after function definitions (avoids TDZ)
+  handleGenerateAndPlayRef.current = handleGenerateAndPlay;
+  startPlaybackSequenceRef.current = startPlaybackSequence;
+  handleNextTrackRef.current = handleNextTrack;
+
   useEffect(() => {
     if (state.status === 'playing') {
       if (state.playbackSource === 'youtube') {
@@ -869,18 +875,24 @@ const App: React.FC = () => {
     }
   }, [state.status, state.audioSrc, state.playbackSource]);
 
-  // YouTube IFrame Player: create / update / auto-advance
+  // YouTube IFrame Player: initialize once
   useEffect(() => {
     if (state.playbackSource !== 'youtube') return;
-    if (!state.youtubeEmbedUrl) return;
-    if (!youtubeContainerRef.current) return;
+    if (youtubePlayerRef.current) return; // Already initialized
 
-    const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId 
-      || state.searchedTrack?.youtubeVideoId 
+    const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId
+      || state.searchedTrack?.youtubeVideoId
       || getFallbackVideoId(state.genrePreset);
 
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
     const createPlayer = () => {
-      if (!youtubeContainerRef.current) return;
+      if (!youtubeContainerRef.current) {
+        retryTimer = setTimeout(createPlayer, 100);
+        return;
+      }
+      if (youtubePlayerRef.current) return;
+      console.log('[YT] Creating player for video:', videoId);
       youtubePlayerRef.current = new (window as any).YT.Player(youtubeContainerRef.current, {
         videoId,
         playerVars: {
@@ -893,10 +905,7 @@ const App: React.FC = () => {
         events: {
           onStateChange: (event: any) => {
             if (event.data === (window as any).YT.PlayerState.ENDED) {
-              // Auto-advance to next track
-              if (state.playlist.length > 1) {
-                handleNextTrack();
-              }
+              handleNextTrackRef.current();
             }
           },
         },
@@ -904,29 +913,37 @@ const App: React.FC = () => {
     };
 
     if ((window as any).YT && (window as any).YT.Player) {
-      if (youtubePlayerRef.current && youtubePlayerRef.current.loadVideoById) {
-        youtubePlayerRef.current.loadVideoById(videoId);
-      } else {
-        createPlayer();
-      }
+      createPlayer();
     } else {
-      // API not ready yet, poll briefly
-      const interval = setInterval(() => {
-        if ((window as any).YT && (window as any).YT.Player) {
-          clearInterval(interval);
-          createPlayer();
-        }
-      }, 500);
-      setTimeout(() => clearInterval(interval), 10000);
+      (window as any).onYouTubeIframeAPIReady = createPlayer;
     }
 
     return () => {
-      if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
-        youtubePlayerRef.current.destroy();
-        youtubePlayerRef.current = null;
-      }
+      if (retryTimer) clearTimeout(retryTimer);
+      (window as any).onYouTubeIframeAPIReady = null;
     };
-  }, [state.playbackSource, state.youtubeEmbedUrl, state.currentTrackIndex, state.playlist.length]);
+  }, [state.playbackSource]);
+
+  // YouTube IFrame Player: load next video when track changes
+  useEffect(() => {
+    if (state.playbackSource !== 'youtube') return;
+    if (!youtubePlayerRef.current || !youtubePlayerRef.current.loadVideoById) return;
+
+    const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId
+      || state.searchedTrack?.youtubeVideoId
+      || getFallbackVideoId(state.genrePreset);
+
+    youtubePlayerRef.current.loadVideoById(videoId);
+  }, [state.currentTrackIndex, state.playbackSource]);
+
+  // YouTube IFrame Player: destroy when leaving youtube mode
+  useEffect(() => {
+    if (state.playbackSource === 'youtube') return;
+    if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
+      youtubePlayerRef.current.destroy();
+      youtubePlayerRef.current = null;
+    }
+  }, [state.playbackSource]);
 
   // When direct generation finishes and status becomes 'playing', start sequence if briefing exists
   useEffect(() => {
@@ -1012,8 +1029,11 @@ const App: React.FC = () => {
         }
       `}</style>
       
+      {/* WebGPU Theme Background */}
+      <BabylonCanvas theme={currentTheme} />
+
       {/* The Device Case */}
-      <div id="device-wrapper" className="relative bg-radio-case w-full max-w-5xl rounded-xl shadow-device border-t border-white/10 p-6 md:p-10 flex flex-col lg:flex-row gap-8 transition-all duration-300 overflow-hidden">
+      <div id="device-wrapper" className="relative z-10 bg-radio-case w-full max-w-5xl rounded-xl shadow-device border-t border-white/10 p-6 md:p-10 flex flex-col lg:flex-row gap-8 transition-all duration-300 overflow-hidden">
          
          {/* THEME SPECIFIC CHASSIS OVERLAYS & HARDWARE DECALS */}
          {currentTheme === 'vaporwave' && (
@@ -1106,7 +1126,7 @@ const App: React.FC = () => {
 
              {/* Badge */}
              <div id="radio-badge" className="mt-auto w-full bg-black/80 border border-white/20 py-2 rounded text-[7px] xl:text-[9px] font-mono text-radio-dim uppercase tracking-wider text-center z-20 leading-tight">
-                MODEL:<br/><span className="text-radio-lit led-text-shadow">LYRIA RADIO</span>
+                MODEL:<br/><span className="text-radio-lit led-text-shadow">AETHERCLOCK</span>
              </div>
          </div>
 
@@ -1572,8 +1592,8 @@ const App: React.FC = () => {
                     )}
 
                     {/* Visualizer and Stream Progress */}
-                    <div id="visualizer-slot" className={`relative transition-all duration-500 ease-in-out ${state.playbackSource === 'youtube' && state.searchedTrack && (state.status === 'playing' || state.status === 'playing_briefing') ? 'h-32 sm:h-48' : 'h-24'}`}>
-                        {state.playbackSource === 'youtube' && state.searchedTrack && (state.status === 'playing' || state.status === 'playing_briefing') ? (
+                    <div id="visualizer-slot" className={`relative transition-all duration-500 ease-in-out ${state.playbackSource === 'youtube' && (state.status === 'playing' || state.status === 'playing_briefing') ? 'h-32 sm:h-48' : 'h-24'}`}>
+                        {state.playbackSource === 'youtube' && (state.status === 'playing' || state.status === 'playing_briefing') ? (
                           <div 
                             className="w-full h-full relative rounded overflow-hidden border-2 border-white/10 shadow-inset-screen pointer-events-auto transition-opacity duration-1000"
                             style={{ opacity: state.status === 'playing' ? 1 : 0.3 }}
@@ -1583,7 +1603,7 @@ const App: React.FC = () => {
                             {/* TRANS-BEAM DIRECT FEED BYPASS CONTROLLER */}
                             <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5">
                               <a 
-                                 href={`https://www.youtube.com/watch?v=${state.searchedTrack.youtubeVideoId || "jfKfPfyJRdk"}`}
+                                 href={`https://www.youtube.com/watch?v=${state.playlist[state.currentTrackIndex]?.youtubeVideoId || state.searchedTrack?.youtubeVideoId || getFallbackVideoId(state.genrePreset)}`}
                                  target="_blank"
                                  rel="noreferrer"
                                  className="flex items-center gap-1 px-2.5 py-1 bg-black/95 hover:bg-radio-lit text-radio-lit hover:text-neutral-50 border border-radio-lit/50 hover:border-transparent rounded text-[9px] uppercase tracking-wider font-mono transition-all shadow-[0_0_8px_var(--radio-glow)] cursor-pointer"

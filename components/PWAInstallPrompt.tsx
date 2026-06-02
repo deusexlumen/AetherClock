@@ -45,7 +45,7 @@ export const PWAInstallPrompt: React.FC = () => {
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-neutral-900/95 border border-radio-lit/30 rounded-lg px-4 py-3 shadow-lg flex items-center gap-3 animate-[fadeIn_0.3s_ease-out]">
       <Download className="w-4 h-4 text-radio-lit flex-shrink-0" />
       <div className="flex flex-col">
-        <span className="text-[10px] font-mono text-white uppercase tracking-wider">Install Lyria Radio</span>
+        <span className="text-[10px] font-mono text-white uppercase tracking-wider">Install AetherClock</span>
         <span className="text-[8px] font-mono text-gray-400">Add to home screen for offline access</span>
       </div>
       <button

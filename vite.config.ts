@@ -18,6 +18,14 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      optimizeDeps: {
+        include: ['@babylonjs/core'],
+      },
+      build: {
+        rollupOptions: {
+          external: ['@babylonjs/core'],
+        }
       }
     };
 });

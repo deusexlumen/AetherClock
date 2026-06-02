@@ -2,6 +2,7 @@ const FALLBACK_AUDIO_URL = '/assets/fallback-alarm.mp3';
 
 let currentOscillatorNodes: { osc: OscillatorNode; gain: GainNode }[] = [];
 let alarmInterval: ReturnType<typeof setInterval> | null = null;
+let audioCtx: AudioContext | null = null;
 
 export const playOfflineFallback = async (): Promise<void> => {
   stopOfflineFallback();
@@ -21,7 +22,10 @@ const playSirenAlarm = (): void => {
   try {
     const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    if (!audioCtx || audioCtx.state === 'closed') {
+      audioCtx = new AudioCtx();
+    }
+    const ctx = audioCtx;
 
     // Two oscillators for a rich siren sound
     const createOscillator = (type: OscillatorType, freq: number, detune: number) => {
@@ -91,6 +95,10 @@ export const stopOfflineFallback = (): void => {
     }
   });
   currentOscillatorNodes = [];
+  if (audioCtx && audioCtx.state !== 'closed') {
+    audioCtx.close().catch(() => {});
+    audioCtx = null;
+  }
 };
 
 export const preloadFallbackAudio = (): void => {
