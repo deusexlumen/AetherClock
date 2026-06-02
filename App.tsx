@@ -309,6 +309,10 @@ const App: React.FC = () => {
         shuffle: false,
         crossfadeSeconds: 0
       },
+      llmConfig: {
+        textModel: 'gemini-3.5-flash',
+        ttsModel: 'gemini-3.1-flash-tts-preview'
+      },
       briefingAudioSrc: null
     };
   });
@@ -355,6 +359,15 @@ const App: React.FC = () => {
       trackCount: 3,
       shuffle: false,
       crossfadeSeconds: 0
+    };
+  });
+
+  const [llmConfig, setLLMConfig] = useState<LLMConfig>(() => {
+    const saved = localStorage.getItem('lyria_llm');
+    if (saved) return JSON.parse(saved);
+    return {
+      textModel: 'gemini-3.5-flash',
+      ttsModel: 'gemini-3.1-flash-tts-preview'
     };
   });
 
@@ -683,7 +696,8 @@ const App: React.FC = () => {
         new Date(),
         state.alarmTime,
         state.genrePreset,
-        blacklist
+        blacklist,
+        llmConfig
       );
 
       let playlist: PlaylistTrack[] = [];
@@ -692,7 +706,7 @@ const App: React.FC = () => {
       if (isYouTube && playlistConfig.enabled) {
         const fetchTrack = () => generateMusicalPrompt(
           state.weather, state.location, state.agenda, new Date(),
-          state.alarmTime, state.genrePreset, blacklist
+          state.alarmTime, state.genrePreset, blacklist, llmConfig
         ).then(r => r.searchedSong);
 
         playlist = await generatePlaylist(fetchTrack, playlistConfig.trackCount);
@@ -724,7 +738,8 @@ const App: React.FC = () => {
           state.weather,
           state.calendar,
           state.alarmTime,
-          voiceBriefingConfig
+          voiceBriefingConfig,
+          llmConfig
         );
         briefingSrc = `data:${briefing.mimeType};base64,${briefing.audioBase64}`;
       }
@@ -1380,7 +1395,52 @@ const App: React.FC = () => {
                          )}
                      </div>
 
-                     {/* 7. PWA & Notifications */}
+                     {/* 7. LLM Model Selection */}
+                     <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
+                         <div className="flex items-center gap-2">
+                             <Sliders className="w-3 h-3 text-radio-lit" />
+                             <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">LLM Models</span>
+                         </div>
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-5">
+                             <div className="flex flex-col gap-1">
+                                 <label className="text-[8px] font-mono text-gray-500 uppercase">Text / Curation Model</label>
+                                 <select
+                                     value={llmConfig.textModel}
+                                     onChange={(e) => {
+                                         const next = { ...llmConfig, textModel: e.target.value as any };
+                                         setLLMConfig(next);
+                                         localStorage.setItem('lyria_llm', JSON.stringify(next));
+                                     }}
+                                     className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
+                                 >
+                                     <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+                                     <option value="gemini-3-flash">Gemini 3 Flash</option>
+                                     <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option>
+                                     <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                     <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+                                     <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                 </select>
+                             </div>
+                             <div className="flex flex-col gap-1">
+                                 <label className="text-[8px] font-mono text-gray-500 uppercase">TTS Model</label>
+                                 <select
+                                     value={llmConfig.ttsModel}
+                                     onChange={(e) => {
+                                         const next = { ...llmConfig, ttsModel: e.target.value as any };
+                                         setLLMConfig(next);
+                                         localStorage.setItem('lyria_llm', JSON.stringify(next));
+                                     }}
+                                     className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
+                                 >
+                                     <option value="gemini-3.1-flash-tts-preview">Gemini 3.1 Flash TTS</option>
+                                     <option value="gemini-2.5-flash-tts">Gemini 2.5 Flash TTS</option>
+                                     <option value="gemini-2.5-pro-tts">Gemini 2.5 Pro TTS</option>
+                                 </select>
+                             </div>
+                         </div>
+                     </div>
+
+                     {/* 8. PWA & Notifications */}
                      <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
                          <div className="flex items-center gap-2">
                              <Download className="w-3 h-3 text-radio-lit" />

@@ -1,10 +1,9 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { WeatherData, WEATHER_CODES, MusicGenre, SearchedSongMetadata } from '../types';
+import { WeatherData, WEATHER_CODES, MusicGenre, SearchedSongMetadata, LLMConfig } from '../types';
 
-// Models
-const MODEL_TEXT = "gemini-3.5-flash"; // Text task / Search grounding
+// Default models (can be overridden via config)
+const DEFAULT_MODEL_TEXT = "gemini-3.5-flash";
 const MODEL_ID_FULL = "lyria-3-pro-preview"; // Full song (public preview name)
-const MODEL_TTS = "gemini-3.1-flash-tts-preview"; // Modern high-quality TTS
 
 export interface SongResult {
   audioBase64: string;
@@ -29,7 +28,8 @@ export const generateMusicalPrompt = async (
   localTime: Date,
   alarmTime: string,
   genrePreset: MusicGenre,
-  blacklist?: string
+  blacklist?: string,
+  config?: LLMConfig
 ): Promise<MusicalPromptResult> => {
   const ai = new GoogleGenAI({ 
     apiKey: process.env.GEMINI_API_KEY,
@@ -98,7 +98,7 @@ export const generateMusicalPrompt = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: MODEL_TEXT,
+      model: config?.textModel || DEFAULT_MODEL_TEXT,
       contents: { parts: [{ text: userPrompt }] },
       config: {
         systemInstruction: systemInstruction,

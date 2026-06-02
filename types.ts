@@ -30,6 +30,9 @@ export interface PlaylistTrack {
   whyExplanation: string;
 }
 
+export type TextModel = 'gemini-3.5-flash' | 'gemini-3-flash' | 'gemini-3.1-flash-lite' | 'gemini-2.5-flash' | 'gemini-2.5-flash-lite' | 'gemini-2.5-pro';
+export type TTSModel = 'gemini-3.1-flash-tts-preview' | 'gemini-2.5-flash-tts' | 'gemini-2.5-pro-tts';
+
 export interface VoiceBriefingConfig {
   enabled: boolean;
   voiceName: 'Fenrir' | 'Kore' | 'Leda';
@@ -37,6 +40,11 @@ export interface VoiceBriefingConfig {
   includeAgenda: boolean;
   includeTime: boolean;
   customGreeting: string;
+}
+
+export interface LLMConfig {
+  textModel: TextModel;
+  ttsModel: TTSModel;
 }
 
 export interface PlaylistConfig {
@@ -70,6 +78,7 @@ export interface AppState {
   currentTrackIndex: number;
   voiceBriefingConfig: VoiceBriefingConfig;
   playlistConfig: PlaylistConfig;
+  llmConfig: LLMConfig;
   briefingAudioSrc: string | null;
 }
 

@@ -1,7 +1,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { WeatherData, WEATHER_CODES, CalendarItem, VoiceBriefingConfig } from '../types';
+import { WeatherData, WEATHER_CODES, CalendarItem, VoiceBriefingConfig, LLMConfig } from '../types';
 
-const MODEL_TTS = "gemini-3.1-flash-tts-preview";
+const DEFAULT_TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
 export interface BriefingResult {
   audioBase64: string;
@@ -13,7 +13,8 @@ export const generateVoiceBriefing = async (
   weather: WeatherData | null,
   agenda: CalendarItem[],
   alarmTime: string,
-  config: VoiceBriefingConfig
+  config: VoiceBriefingConfig,
+  llmConfig?: LLMConfig
 ): Promise<BriefingResult> => {
   const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
