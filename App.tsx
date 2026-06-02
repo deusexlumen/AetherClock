@@ -367,9 +367,68 @@ const App: React.FC = () => {
   });
   const [isOnlineStatus, setIsOnlineStatus] = useState<boolean>(true);
   const [isAppInstalled, setIsAppInstalled] = useState<boolean>(false);
+  const [isScreenSaverActive, setIsScreenSaverActive] = useState<boolean>(false);
+  const screenSaverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SCREENSAVER_DELAY = 30000; // 30 seconds
+
+  // Screen saver logic
+  const resetScreenSaverTimer = () => {
+    if (screenSaverTimerRef.current) {
+      clearTimeout(screenSaverTimerRef.current);
+    }
+    if (isScreenSaverActive) {
+      setIsScreenSaverActive(false);
+    }
+    screenSaverTimerRef.current = setTimeout(() => {
+      if (state.status === 'idle' || state.status === 'ready') {
+        setIsScreenSaverActive(true);
+      }
+    }, SCREENSAVER_DELAY);
+  };
+
+  useEffect(() => {
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(e => window.addEventListener(e, resetScreenSaverTimer));
+    resetScreenSaverTimer();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetScreenSaverTimer));
+      if (screenSaverTimerRef.current) clearTimeout(screenSaverTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status]);
 
   // TTS Player instance
   const ttsPlayerRef = useRef(new TTSPlayer());
+
+  // Audio Context & Analyser for real visualizer
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  const connectAudioVisualizer = (audioElement: HTMLAudioElement) => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioContextRef.current;
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    // Only create source if not already connected
+    if (!sourceNodeRef.current || sourceNodeRef.current.mediaElement !== audioElement) {
+      try {
+        sourceNodeRef.current = ctx.createMediaElementSource(audioElement);
+        analyserRef.current = ctx.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        analyserRef.current.smoothingTimeConstant = 0.85;
+        sourceNodeRef.current.connect(analyserRef.current);
+        analyserRef.current.connect(ctx.destination);
+      } catch (err) {
+        // Already connected or cross-origin issue
+        console.warn('[Audio] Could not connect visualizer:', err);
+      }
+    }
+  };
 
   // Refs for stable alarm-check callbacks
   const handleGenerateAndPlayRef = useRef(handleGenerateAndPlay);
@@ -781,6 +840,13 @@ const App: React.FC = () => {
     }
   }, [state.status, state.audioSrc, state.playbackSource]);
 
+  // Connect audio element to visualizer when playing non-YouTube audio
+  useEffect(() => {
+    if ((state.status === 'playing' || state.status === 'playing_briefing') && audioRef.current && state.playbackSource !== 'youtube') {
+      connectAudioVisualizer(audioRef.current);
+    }
+  }, [state.status, state.audioSrc, state.playbackSource]);
+
   // When direct generation finishes and status becomes 'playing', start sequence if briefing exists
   useEffect(() => {
     if (state.status === 'playing' && state.playlist.length > 0 && !state.youtubeEmbedUrl) {
@@ -829,6 +895,33 @@ const App: React.FC = () => {
         .animate-warning-static { animation: warningStatic 0.15s infinite; }
         .animate-luxury-crest { background-size: 200% 200%; animation: luxuryCrest 6s infinite ease-in-out; }
         .animate-signal-ray { animation: signalRay 2s infinite ease-in-out; }
+        
+        /* LED warm-up glow instead of instant on */
+        @keyframes ledWarmUp {
+          0% { opacity: 0; box-shadow: 0 0 0px currentColor; }
+          40% { opacity: 0.6; box-shadow: 0 0 4px currentColor; }
+          100% { opacity: 1; box-shadow: 0 0 8px currentColor, 0 0 16px currentColor; }
+        }
+        .led-warm-up {
+          animation: ledWarmUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+        
+        /* Springy button press */
+        .btn-spring {
+          transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+        }
+        .btn-spring:active {
+          transform: scale(0.92) translateY(1px);
+        }
+        
+        /* Subtle ambient pulse for active elements */
+        @keyframes ambientPulse {
+          0%, 100% { box-shadow: 0 0 5px rgba(255, 51, 51, 0.2); }
+          50% { box-shadow: 0 0 15px rgba(255, 51, 51, 0.5); }
+        }
+        .ambient-pulse {
+          animation: ambientPulse 3s infinite ease-in-out;
+        }
         
         .sonar-grid-bg {
           background-image: 
@@ -1366,7 +1459,12 @@ const App: React.FC = () => {
                           </div>
                         ) : (
                           <div className="w-full h-full relative">
-                            <Visualizer isActive={(state.status === 'playing' || state.status === 'playing_briefing') && state.playbackSource !== 'youtube'} status={state.status} />
+                            <Visualizer 
+                              analyser={analyserRef.current} 
+                              isActive={(state.status === 'playing' || state.status === 'playing_briefing') && state.playbackSource !== 'youtube'} 
+                              status={state.status} 
+                              genre={state.genrePreset}
+                            />
                             
                             {/* Autoplay Blocker Overlay */}
                             {isAutoplayBlocked && (state.status === 'playing' || state.status === 'playing_briefing') && state.playbackSource !== 'youtube' && (
@@ -1442,15 +1540,15 @@ const App: React.FC = () => {
                                   searchedTrack: null // Clear previous searched song
                                 }));
                              }}
-                             className={`p-2 rounded font-mono text-[9px] font-bold uppercase border tracking-wider transition-all duration-150 relative overflow-hidden flex flex-col items-center gap-1
+                             className={`btn-spring p-2 rounded font-mono text-[9px] font-bold uppercase border tracking-wider relative overflow-hidden flex flex-col items-center gap-1
                                 ${active 
-                                  ? 'bg-neutral-800 border-radio-lit/80 text-radio-lit translate-y-[1px] shadow-[inset_0_2px_4px_rgba(0,0,0,0.8),0_0_8px_rgba(255,51,51,0.2)] led-text-shadow' 
-                                  : 'bg-neutral-800/40 border-white/5 text-gray-500 hover:text-gray-300 hover:bg-neutral-850 shadow-btn hover:border-white/10 active:translate-y-[1px]'
+                                  ? 'bg-neutral-800 border-radio-lit/80 text-radio-lit shadow-[inset_0_2px_4px_rgba(0,0,0,0.8),0_0_8px_rgba(255,51,51,0.2)] led-text-shadow' 
+                                  : 'bg-neutral-800/40 border-white/5 text-gray-500 hover:text-gray-300 hover:bg-neutral-850 shadow-btn hover:border-white/10'
                                 }
                              `}
                           >
                              {/* Indicator Lamp */}
-                             <div className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${active ? 'bg-radio-lit shadow-[0_0_4px_#ff3333]' : 'bg-black opacity-30'}`}></div>
+                             <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-radio-lit led-warm-up' : 'bg-black opacity-30'}`} style={{ color: 'var(--radio-lit)' }}></div>
                              
                              <span className="text-[8px] leading-none mb-0.5">{station}</span>
                              <span className="text-[7px] text-gray-600 block leading-none font-digital font-medium">{getStationFreq(station)}</span>
@@ -1621,11 +1719,11 @@ const App: React.FC = () => {
                 <button 
                     id="deck-btn-toggle"
                     onClick={() => setState(prev => ({ ...prev, isAlarmActive: !prev.isAlarmActive }))}
-                    className={`col-span-1 rounded shadow-btn active:shadow-btn-pressed active:translate-y-[2px] transition-all flex flex-col items-center justify-center p-2 border-t border-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit focus-visible:ring-inset bg-radio-btn hover:bg-neutral-800`}
+                    className={`btn-spring col-span-1 rounded shadow-btn active:shadow-btn-pressed flex flex-col items-center justify-center p-2 border-t border-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit focus-visible:ring-inset bg-radio-btn hover:bg-neutral-800`}
                     aria-pressed={state.isAlarmActive}
                     aria-label="Toggle Alarm Activation"
                 >
-                    <div className={`w-2 h-2 rounded-full mb-1 transition-all duration-300 shadow-[0_0_5px_current] ${state.isAlarmActive ? 'bg-radio-lit shadow-radio-lit' : 'bg-black border border-gray-750 opacity-50'}`}></div>
+                    <div className={`w-2 h-2 rounded-full mb-1 ${state.isAlarmActive ? 'bg-radio-lit led-warm-up' : 'bg-black border border-gray-750 opacity-50'}`} style={{ color: 'var(--radio-lit)' }}></div>
                     <span className={`text-[10px] font-bold uppercase transition-colors ${state.isAlarmActive ? 'text-gray-200' : 'text-gray-500'}`}>Active</span>
                 </button>
 
@@ -1642,7 +1740,7 @@ const App: React.FC = () => {
                      }
                    }}
                    disabled={state.status !== 'idle' && state.status !== 'playing' && state.status !== 'playing_briefing'}
-                   className={`col-span-1 rounded shadow-btn active:shadow-btn-pressed active:translate-y-[2px] transition-all flex flex-col items-center justify-center p-2 border-t border-white/5 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit focus-visible:ring-inset`}
+                   className={`btn-spring col-span-1 rounded shadow-btn active:shadow-btn-pressed flex flex-col items-center justify-center p-2 border-t border-white/5 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit focus-visible:ring-inset`}
                    aria-label={state.status === 'playing' || state.status === 'playing_briefing' ? 'Stop Tuner' : 'Generate broadcast'}
                 >
                    {state.status === 'playing' || state.status === 'playing_briefing' ? (
@@ -1677,6 +1775,27 @@ const App: React.FC = () => {
       )}
 
       <PWAInstallPrompt />
+
+      {/* Screen Saver Overlay */}
+      {isScreenSaverActive && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-6 cursor-pointer transition-opacity duration-700"
+          onClick={() => setIsScreenSaverActive(false)}
+        >
+          <div className="text-center">
+            <Clock isAlarmActive={state.isAlarmActive} />
+            {state.isAlarmActive && (
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-radio-lit animate-pulse shadow-[0_0_8px_rgba(255,51,51,0.8)]" />
+                <span className="text-radio-lit font-mono text-xs uppercase tracking-widest">Alarm Armed</span>
+              </div>
+            )}
+          </div>
+          <span className="text-gray-600 font-mono text-[10px] uppercase tracking-widest animate-pulse">
+            Tap to wake
+          </span>
+        </div>
+      )}
     </div>
   );
 };

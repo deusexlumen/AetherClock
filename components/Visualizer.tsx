@@ -1,108 +1,140 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { MusicGenre } from '../types';
 
-interface VisualizerProps {
+interface Props {
+  analyser: AnalyserNode | null;
   isActive: boolean;
   status: string;
+  genre: MusicGenre;
 }
 
-export const Visualizer: React.FC<VisualizerProps> = ({ isActive, status }) => {
-  const [heights, setHeights] = useState<number[]>(new Array(16).fill(0));
-  const currentHeights = useRef<number[]>(new Array(16).fill(0));
-  const animationRef = useRef<number>(0);
-  
-  const isPlaying = status === 'playing';
-  const isGenerating = status === 'generating_music' || status === 'generating_prompt';
-  
-  // Calculate if we should be visible
-  const shouldBeVisible = isActive || isGenerating || heights.some(h => h > 0);
+const BAR_COUNT = 32;
+
+export const Visualizer: React.FC<Props> = ({ analyser, isActive, status, genre }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
+  const simRef = useRef<number[]>(new Array(BAR_COUNT).fill(0));
+  const timeRef = useRef<number>(0);
 
   useEffect(() => {
-    let lastTime = 0;
-    const fps = 30;
-    const interval = 1000 / fps;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    const animate = (timestamp: number) => {
-      if (timestamp - lastTime >= interval) {
-        lastTime = timestamp;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
 
-        if (isPlaying) {
-          const time = Date.now() / 150;
-          const targetHeights = Array.from({ length: 16 }, (_, i) => {
-             let val = Math.random() * 20;
-             val += Math.sin(time + i * 0.4) * 20;
-             if (i < 4) {
-                const beat = Math.sin(time * 2) > 0.7 ? 50 : 0;
-                val += beat;
-             }
-             val += 20;
-             if (i > 10) val += Math.random() * 30;
-             return Math.max(5, Math.min(100, val));
-          });
+    const barWidth = rect.width / BAR_COUNT;
+    const barGap = 2;
+    const drawWidth = barWidth - barGap;
 
-          currentHeights.current = currentHeights.current.map((curr, i) => {
-             return curr + (targetHeights[i] - curr) * 0.4;
-          });
-          setHeights([...currentHeights.current]);
+    const draw = () => {
+      const width = rect.width;
+      const height = rect.height;
+      ctx.clearRect(0, 0, width, height);
 
-        } else if (isGenerating) {
-          const t = Date.now() / 150;
-          const generated = Array.from({ length: 16 }, (_, i) => {
-             return Math.sin(t + i * 0.5) * 40 + 40;
-          });
-          setHeights(generated);
-          currentHeights.current = generated;
+      let frequencies: number[] = [];
 
-        } else {
-          // Idle - decay
-          const allZero = currentHeights.current.every(h => h < 0.1);
-          if (!allZero) {
-             currentHeights.current = currentHeights.current.map((curr) => {
-                return Math.max(0, curr * 0.8);
-             });
-             setHeights([...currentHeights.current]);
+      if (analyser && isActive) {
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(dataArray);
+        // Downsample to BAR_COUNT
+        const step = Math.floor(bufferLength / BAR_COUNT);
+        for (let i = 0; i < BAR_COUNT; i++) {
+          let sum = 0;
+          for (let j = 0; j < step; j++) {
+            sum += dataArray[i * step + j];
           }
+          frequencies.push(sum / step / 255); // normalize 0-1
+        }
+      } else if (isActive) {
+        // Simulated genre-based visualization
+        timeRef.current += 0.05;
+        const t = timeRef.current;
+        for (let i = 0; i < BAR_COUNT; i++) {
+          let base = 0;
+          switch (genre) {
+            case 'lofi':
+            case 'ambient':
+              base = Math.sin(t * 0.5 + i * 0.2) * 0.3 + 0.3;
+              break;
+            case 'rock':
+            case 'hiphop':
+              base = Math.abs(Math.sin(t * 3 + i * 0.8)) * 0.7 + 0.2;
+              break;
+            case 'synthwave':
+              base = Math.sin(t * 1.5 + i * 0.3) * 0.4 + 0.4;
+              break;
+            case 'jazz':
+              base = Math.sin(t * 0.8 + i * 0.15) * 0.25 + 0.35 + Math.random() * 0.1;
+              break;
+            case 'classical':
+              base = Math.sin(t * 0.3 + i * 0.1) * 0.2 + 0.3;
+              break;
+            default:
+              base = Math.sin(t + i * 0.25) * 0.3 + 0.35;
+          }
+          // Smooth transition
+          simRef.current[i] += (base - simRef.current[i]) * 0.15;
+          frequencies.push(simRef.current[i]);
+        }
+      } else {
+        // Idle: decay to zero
+        for (let i = 0; i < BAR_COUNT; i++) {
+          simRef.current[i] *= 0.9;
+          frequencies.push(simRef.current[i]);
         }
       }
-      animationRef.current = requestAnimationFrame(animate);
+
+      // Draw bars
+      for (let i = 0; i < BAR_COUNT; i++) {
+        const value = frequencies[i];
+        const barHeight = value * height * 0.9;
+        const x = i * barWidth + barGap / 2;
+        const y = height - barHeight;
+
+        // Gradient based on height
+        const gradient = ctx.createLinearGradient(0, height, 0, 0);
+        gradient.addColorStop(0, 'rgba(255, 51, 51, 0.3)');
+        gradient.addColorStop(0.5, 'rgba(255, 51, 51, 0.7)');
+        gradient.addColorStop(1, 'rgba(255, 150, 50, 1)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, drawWidth, barHeight);
+
+        // Top cap
+        ctx.fillStyle = 'rgba(255, 200, 100, 0.9)';
+        ctx.fillRect(x, y - 2, drawWidth, 2);
+      }
+
+      animRef.current = requestAnimationFrame(draw);
     };
 
-    animationRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, [isPlaying, isGenerating]);
+    draw();
+    return () => cancelAnimationFrame(animRef.current);
+  }, [analyser, isActive, genre]);
+
+  if (status === 'generating_prompt' || status === 'generating_briefing' || status === 'generating_music') {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="flex items-center gap-2 text-radio-lit font-mono text-xs uppercase tracking-widest animate-pulse">
+          <div className="w-2 h-2 rounded-full bg-radio-lit animate-ping" />
+          Tuning...
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`w-full bg-black/40 border border-white/5 rounded p-3 transition-opacity duration-1000 ${shouldBeVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="flex items-end justify-between h-16 sm:h-20 gap-[2px] sm:gap-1">
-        {heights.map((h, i) => {
-            return (
-                <div key={i} className="flex flex-col gap-[1px] w-full h-full justify-end group">
-                   {[...Array(16)].map((_, j) => {
-                       const totalSegments = 16;
-                       const segmentThreshold = (j + 1) * (100 / totalSegments); 
-                       const isLit = h >= segmentThreshold;
-                       
-                       return (
-                           <div 
-                             key={j}
-                             className={`w-full h-full rounded-[0.5px] transition-all duration-75 ${
-                                 isLit 
-                                 ? 'bg-radio-lit shadow-[0_0_8px_rgba(255,51,51,0.6)] opacity-100' 
-                                 : 'bg-white/5 opacity-20' 
-                             }`}
-                           ></div>
-                       );
-                   })}
-                </div>
-            );
-        })}
-        </div>
-        <div className="flex justify-between mt-2 px-1 border-t border-white/5 pt-1">
-             <span className="text-[8px] font-mono text-radio-dim uppercase tracking-wider">Lo</span>
-             <span className="text-[8px] font-mono text-radio-dim uppercase tracking-wider">Mid</span>
-             <span className="text-[8px] font-mono text-radio-dim uppercase tracking-wider">Hi</span>
-        </div>
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="w-full h-full"
+      style={{ display: 'block' }}
+    />
   );
 };
