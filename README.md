@@ -6,6 +6,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?logo=tailwindcss)](https://tailwindcss.com)
+[![Babylon.js](https://img.shields.io/badge/Babylon.js-v9-FF0000?logo=babylonjs)](https://www.babylonjs.com/)
 [![PWA](https://img.shields.io/badge/PWA-Ready-5A0FC8?logo=pwa)](https://web.dev/progressive-web-apps/)
 
 ![AetherClock Preview](https://via.placeholder.com/800x450/1a1a1a/ff3333?text=AetherClock+Preview)
@@ -38,21 +39,23 @@ Tracks are discovered in real-time via Google Search Grounding.
 - **Push notifications** when your alarm fires — even if the app is in the background
 - **Service Worker** caches assets for instant load times
 
-### 🎨 10 Retro Themes
+### 🎨 10 Retro Themes (3 with Live WebGL Backgrounds)
 From cyberpunk obsidian to premium brass mahogany. Every theme dynamically morphs the entire UI — colors, glows, scanlines, sonar grids, and hardware decals.
 
-| Theme | Vibe |
-|---|---|
-| Obsidian Cyberpunk | Red neon, dystopian |
-| Sandalwood Amber | Warm, vintage |
-| Futuristic Cobalt | Blue tech |
-| Premium Vaporwave | Purple & cyan, palm trees |
-| Premium Antique Mahogany | Brass screws, wood |
-| Premium Reactor Toxic-Green | Biohazard stripes |
-| Premium Space Odyssey | Star twinkle, crosshairs |
-| Premium Royal Velvet | Gold filigree, crowns |
-| Premium Sonar Marine | Green radar grid |
-| Ivory Coast Emerald | Light mode, clean |
+**Premium themes** feature full-screen animated **Babylon.js WebGL** scenes that react to your music's FFT data in real time:
+
+| Theme | Vibe | Background |
+|---|---|---|
+| Obsidian Cyberpunk | Red neon, dystopian | CSS gradients |
+| Sandalwood Amber | Warm, vintage | CSS gradients |
+| Futuristic Cobalt | Blue tech | CSS gradients |
+| **★ Vaporwave Cyber-Luxe** | Purple & magenta, retro sun | 🌴 **WebGL** — animated grid floor, rotating sun, bloom |
+| **★ Antique Mahogany Brass** | Brass screws, wood | CSS gradients |
+| **★ Reactor Toxic-Green** | Biohazard stripes | CSS gradients |
+| **★ Space Odyssey** | Deep space, orbital ring | 🌌 **WebGL** — 3,000 star particles, rotating torus, planet |
+| **★ Royal Velvet** | Gold filigree, crowns | CSS gradients |
+| **★ Sonar Marine** | Green radar, depth fog | 🛸 **WebGL** — sonar ping rings, rising bubbles, depth fog |
+| Ivory Coast Emerald | Light mode, clean | CSS gradients |
 
 ### ⚙️ Deep Customization
 Every feature is toggleable and persisted in `localStorage`:
@@ -115,6 +118,7 @@ npm run preview
 | Styling | Tailwind CSS (CDN) + CSS Custom Properties |
 | Icons | Lucide React |
 | AI SDK | `@google/genai` |
+| 3D Engine | `@babylonjs/core` (WebGL2) |
 | Weather | Open-Meteo (free, no key) |
 | Fonts | Orbitron, Share Tech Mono |
 
@@ -210,6 +214,7 @@ In the **Playback Source** toggle (top right of the station dial board), you can
 - [x] PWA + Service Worker
 - [x] Offline fallback tone
 - [x] Push notifications
+- [x] Babylon.js WebGL animated themes (Vaporwave, Space, Submarine)
 - [ ] Background alarm via Web Push (serverless periodic sync)
 - [ ] Custom user-uploaded alarm tones
 - [ ] Spotify / Apple Music integration
