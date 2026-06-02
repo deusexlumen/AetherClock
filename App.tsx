@@ -12,7 +12,7 @@ import {
   isStandalone,
   captureInstallPrompt 
 } from './services/pwa';
-import { playOfflineFallback } from './services/offlineAudio';
+import { playOfflineFallback, stopOfflineFallback } from './services/offlineAudio';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { generateMusicalPrompt, generateSong } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
@@ -368,8 +368,11 @@ const App: React.FC = () => {
   const [isOnlineStatus, setIsOnlineStatus] = useState<boolean>(true);
   const [isAppInstalled, setIsAppInstalled] = useState<boolean>(false);
   const [isScreenSaverActive, setIsScreenSaverActive] = useState<boolean>(false);
+  const [screenSaverTimeout, setScreenSaverTimeout] = useState<number>(() => {
+    const saved = localStorage.getItem('lyria_screensaver_timeout');
+    return saved !== null ? parseInt(saved, 10) : 30;
+  });
   const screenSaverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const SCREENSAVER_DELAY = 30000; // 30 seconds
 
   // Screen saver logic
   const resetScreenSaverTimer = () => {
@@ -383,7 +386,7 @@ const App: React.FC = () => {
       if (state.status === 'idle' || state.status === 'ready') {
         setIsScreenSaverActive(true);
       }
-    }, SCREENSAVER_DELAY);
+    }, screenSaverTimeout * 1000);
   };
 
   useEffect(() => {
@@ -404,6 +407,10 @@ const App: React.FC = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  // YouTube IFrame Player
+  const youtubePlayerRef = useRef<any>(null);
+  const youtubeContainerRef = useRef<HTMLDivElement>(null);
 
   const connectAudioVisualizer = (audioElement: HTMLAudioElement) => {
     if (!audioContextRef.current) {
@@ -846,6 +853,65 @@ const App: React.FC = () => {
       connectAudioVisualizer(audioRef.current);
     }
   }, [state.status, state.audioSrc, state.playbackSource]);
+
+  // YouTube IFrame Player: create / update / auto-advance
+  useEffect(() => {
+    if (state.playbackSource !== 'youtube') return;
+    if (!state.youtubeEmbedUrl) return;
+    if (!youtubeContainerRef.current) return;
+
+    const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId 
+      || state.searchedTrack?.youtubeVideoId 
+      || getFallbackVideoId(state.genrePreset);
+
+    const createPlayer = () => {
+      if (!youtubeContainerRef.current) return;
+      youtubePlayerRef.current = new (window as any).YT.Player(youtubeContainerRef.current, {
+        videoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          modestbranding: 1,
+          rel: 0,
+          enablejsapi: 1,
+        },
+        events: {
+          onStateChange: (event: any) => {
+            if (event.data === (window as any).YT.PlayerState.ENDED) {
+              // Auto-advance to next track
+              if (state.playlist.length > 1) {
+                handleNextTrack();
+              }
+            }
+          },
+        },
+      });
+    };
+
+    if ((window as any).YT && (window as any).YT.Player) {
+      if (youtubePlayerRef.current && youtubePlayerRef.current.loadVideoById) {
+        youtubePlayerRef.current.loadVideoById(videoId);
+      } else {
+        createPlayer();
+      }
+    } else {
+      // API not ready yet, poll briefly
+      const interval = setInterval(() => {
+        if ((window as any).YT && (window as any).YT.Player) {
+          clearInterval(interval);
+          createPlayer();
+        }
+      }, 500);
+      setTimeout(() => clearInterval(interval), 10000);
+    }
+
+    return () => {
+      if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
+        youtubePlayerRef.current.destroy();
+        youtubePlayerRef.current = null;
+      }
+    };
+  }, [state.playbackSource, state.youtubeEmbedUrl, state.currentTrackIndex, state.playlist.length]);
 
   // When direct generation finishes and status becomes 'playing', start sequence if briefing exists
   useEffect(() => {
@@ -1349,6 +1415,21 @@ const App: React.FC = () => {
                                  </p>
                              </div>
                              <div className="flex flex-col gap-1">
+                                 <div className="flex flex-col gap-0.5">
+                                     <label className="text-[8px] font-mono text-gray-500 uppercase">Screensaver Timeout ({screenSaverTimeout}s)</label>
+                                     <input
+                                         type="range" min="5" max="300" step="5"
+                                         value={screenSaverTimeout}
+                                         onChange={(e) => {
+                                             const val = parseInt(e.target.value);
+                                             setScreenSaverTimeout(val);
+                                             localStorage.setItem('lyria_screensaver_timeout', String(val));
+                                         }}
+                                         className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
+                                     />
+                                 </div>
+                             </div>
+                             <div className="flex flex-col gap-1">
                                  <div className="flex items-center gap-2">
                                      <WifiOff className="w-3 h-3 text-gray-500" />
                                      <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider cursor-pointer flex items-center gap-1.5">
@@ -1433,7 +1514,10 @@ const App: React.FC = () => {
                     {/* Visualizer and Stream Progress */}
                     <div id="visualizer-slot" className={`relative transition-all duration-500 ease-in-out ${state.playbackSource === 'youtube' && state.searchedTrack && (state.status === 'playing' || state.status === 'playing_briefing') ? 'h-32 sm:h-48' : 'h-24'}`}>
                         {state.playbackSource === 'youtube' && state.searchedTrack && (state.status === 'playing' || state.status === 'playing_briefing') ? (
-                          <div className="w-full h-full relative rounded overflow-hidden border-2 border-white/10 shadow-inset-screen pointer-events-auto">
+                          <div 
+                            className="w-full h-full relative rounded overflow-hidden border-2 border-white/10 shadow-inset-screen pointer-events-auto transition-opacity duration-1000"
+                            style={{ opacity: state.status === 'playing' ? 1 : 0.3 }}
+                          >
                             <div className="absolute inset-x-0 top-0 h-full bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] z-10 pointer-events-none opacity-50 block"></div>
                             
                             {/* TRANS-BEAM DIRECT FEED BYPASS CONTROLLER */}
@@ -1449,13 +1533,10 @@ const App: React.FC = () => {
                               </a>
                             </div>
 
-                            <iframe 
+                            <div 
+                               ref={youtubeContainerRef}
                                className="w-full h-full opacity-80 mix-blend-screen sepia-[0.3]" 
-                               src={state.youtubeEmbedUrl || buildEmbedUrl(state.searchedTrack?.youtubeVideoId || getFallbackVideoId(state.genrePreset))} 
-                               allow="autoplay; encrypted-media; picture-in-picture" 
-                               allowFullScreen
-                               title="YouTube Stream"
-                            ></iframe>
+                            />
                           </div>
                         ) : (
                           <div className="w-full h-full relative">
@@ -1734,6 +1815,7 @@ const App: React.FC = () => {
                      if (state.status === 'playing' || state.status === 'playing_briefing') {
                         audioRef.current?.pause();
                         ttsPlayerRef.current.stop();
+                        stopOfflineFallback();
                         setState(prev => ({ ...prev, status: 'idle' }));
                      } else if (state.status === 'idle') {
                         handleGenerateAndPlay();
