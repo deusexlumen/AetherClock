@@ -1,0 +1,20 @@
+{
+  "name": "Lyria Radio Alarm Clock",
+  "short_name": "Lyria Radio",
+  "description": "AI-powered alarm clock with thematic playlists and voice briefing.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#ff3333",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "lifestyle"],
+  "lang": "en"
+}

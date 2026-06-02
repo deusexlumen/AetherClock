@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lyria Radio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              mono: ['"Share Tech Mono"', 'monospace'],
+              digital: ['"Orbitron"', 'sans-serif'],
+            },
+            colors: {
+              radio: {
+                case: 'var(--radio-case, #1a1a1a)',     // Dark plastic
+                face: 'var(--radio-face, #0a0a0a)',     // Display background
+                dim: 'var(--radio-dim, #2a2a2a)',       // Inactive segments
+                lit: 'var(--radio-lit, #ff3333)',       // Active Red LED
+                glow: 'var(--radio-glow, rgba(255, 51, 51, 0.6))', // Glow color
+                accent: '#3b82f6',                      // Blue accent for some indicators
+                btn: 'var(--radio-btn, #262626)',       // Button color
+              },
+            },
+            backgroundImage: {
+              'speaker-grille': 'radial-gradient(circle, #000 20%, transparent 25%)',
+              'brushed-metal': 'linear-gradient(180deg, #333 0%, #222 50%, #1a1a1a 100%)',
+            },
+            boxShadow: {
+              'led': '0 0 10px rgba(255, 51, 51, 0.5), 0 0 20px rgba(255, 51, 51, 0.3)',
+              'device': '0 20px 50px -10px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.1)',
+              'btn': '0 4px 0 #000, 0 5px 10px rgba(0,0,0,0.5)',
+              'btn-pressed': '0 1px 0 #000, inset 0 2px 5px rgba(0,0,0,0.5)',
+              'inset-screen': 'inset 0 2px 10px rgba(0,0,0,0.8)',
+            }
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        background-color: var(--body-bg, #121212);
+        color: var(--body-text, #e5e5e5);
+        background-image: var(--body-bg-gradient, radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000 100%));
+        transition: background-color 0.5s ease, color 0.5s ease;
+      }
+      /* Hide default time picker icon */
+      input[type="time"]::-webkit-calendar-picker-indicator {
+        display: none;
+      }
+      input[type="time"] {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+      }
+      .led-text-shadow {
+        text-shadow: var(--led-shadow, 0 0 10px rgba(255, 51, 51, 0.7));
+      }
+    </style>
+  
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    window.deferredInstallPrompt = e;
+  });
+</script>
+</body>
+</html>
