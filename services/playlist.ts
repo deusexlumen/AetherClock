@@ -14,7 +14,11 @@ export const REPUTABLE_YOUTUBE_FALLBACKS: Record<MusicGenre, string> = {
 };
 
 export const buildEmbedUrl = (videoId: string): string => {
-  return `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&playlist=${videoId}&enablejsapi=1`;
+  const id = videoId?.trim();
+  if (!id) {
+    return `https://www.youtube.com/embed/?autoplay=1&controls=0&modestbranding=1&enablejsapi=1`;
+  }
+  return `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&modestbranding=1&playlist=${id}&loop=1&enablejsapi=1`;
 };
 
 export const getFallbackVideoId = (genre: MusicGenre): string => {
@@ -42,9 +46,10 @@ export const generatePlaylist = async (
 
   for (const meta of results) {
     if (!meta) continue;
-    const videoId = meta.youtubeVideoId || '';
-    if (videoId && usedIds.has(videoId)) continue;
-    if (videoId) usedIds.add(videoId);
+    const videoId = meta.youtubeVideoId?.trim();
+    if (!videoId) continue;
+    if (usedIds.has(videoId)) continue;
+    usedIds.add(videoId);
 
     tracks.push({
       title: meta.title,

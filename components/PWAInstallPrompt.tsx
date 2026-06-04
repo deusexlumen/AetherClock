@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
-import { installPWA, getDeferredPrompt, isStandalone, clearDeferredPrompt } from '../services/pwa';
+import { installPWA, getDeferredPrompt, isStandalone, clearDeferredPrompt, captureInstallPrompt } from '../services/pwa';
 
 export const PWAInstallPrompt: React.FC = () => {
   const [visible, setVisible] = useState(false);
@@ -19,10 +19,25 @@ export const PWAInstallPrompt: React.FC = () => {
     // Check immediately and after a delay (in case prompt fires late)
     checkPrompt();
     const timer = setTimeout(checkPrompt, 2000);
-    window.addEventListener('beforeinstallprompt', () => setVisible(true));
+
+    const onBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      captureInstallPrompt(e);
+      setVisible(true);
+    };
+
+    const onAppInstalled = () => {
+      setVisible(false);
+      clearDeferredPrompt();
+    };
+
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+    window.addEventListener('appinstalled', onAppInstalled);
 
     return () => {
       clearTimeout(timer);
+      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', onAppInstalled);
     };
   }, []);
 

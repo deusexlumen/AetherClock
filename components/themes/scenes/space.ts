@@ -25,7 +25,7 @@ export function buildSpaceScene(engine: Engine, fftData?: Float32Array): Scene {
 
   // Starfield particles
   const starSystem = new ParticleSystem('stars', 3000, scene);
-  starSystem.particleTexture = new Texture('https://www.babylonjs-playground.com/textures/flare.png', scene);
+  starSystem.particleTexture = new Texture('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', scene);
   starSystem.emitter = new Vector3(0, 0, 0);
   starSystem.minEmitBox = new Vector3(-50, -50, -50);
   starSystem.maxEmitBox = new Vector3(50, 50, 50);

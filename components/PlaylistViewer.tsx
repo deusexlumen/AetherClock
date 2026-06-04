@@ -52,14 +52,16 @@ export const PlaylistViewer: React.FC<Props> = ({ playlist, currentIndex, onNext
         <div className="flex justify-center gap-2 mt-0.5">
           <button
             onClick={onPrev}
-            className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white transition-colors"
+            disabled={isPlayingBriefing}
+            className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Previous track"
           >
             <SkipBack className="w-3 h-3" />
           </button>
           <button
             onClick={onNext}
-            className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white transition-colors"
+            disabled={isPlayingBriefing}
+            className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Next track"
           >
             <SkipForward className="w-3 h-3" />

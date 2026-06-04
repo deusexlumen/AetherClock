@@ -7,8 +7,12 @@ export class TTSPlayer {
     this.audio = new Audio(url);
     if (onEnded) {
       this.audio.addEventListener('ended', onEnded, { once: true });
+      this.audio.addEventListener('error', onEnded, { once: true });
     }
-    this.audio.play().catch(console.error);
+    this.audio.play().catch((err) => {
+      console.error('[TTS] Playback failed:', err);
+      if (onEnded) onEnded();
+    });
   }
 
   stop(): void {

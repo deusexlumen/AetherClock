@@ -36,7 +36,7 @@ export function buildSubmarineScene(engine: Engine, fftData?: Float32Array): Sce
 
   // Bubble particles
   const bubbleSystem = new ParticleSystem('bubbles', 500, scene);
-  bubbleSystem.particleTexture = new Texture('https://www.babylonjs-playground.com/textures/flare.png', scene);
+  bubbleSystem.particleTexture = new Texture('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', scene);
   bubbleSystem.emitter = new Vector3(0, -5, 0);
   bubbleSystem.minEmitBox = new Vector3(-10, 0, -10);
   bubbleSystem.maxEmitBox = new Vector3(10, 0, 10);
@@ -78,14 +78,12 @@ export function buildSubmarineScene(engine: Engine, fftData?: Float32Array): Sce
 
   // Animation
   let t = 0;
-  let pingTime = 0;
   scene.onBeforeRenderObservable.add(() => {
     const dt = engine.getDeltaTime() * 0.001;
     t += dt;
 
     // Sonar ping
-    pingTime += dt;
-    const pingCycle = pingTime % 3; // 3 second ping cycle
+    const pingCycle = (t % 3); // 3 second ping cycle
     if (pingCycle < 2) {
       const pingScale = 0.1 + (pingCycle / 2) * 4;
       pingRing.scaling.setAll(pingScale);

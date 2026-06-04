@@ -6,6 +6,8 @@ interface BabylonCanvasProps {
   fftData?: Float32Array;
 }
 
+const WEBGL_THEMES = new Set(['vaporwave', 'space', 'submarine']);
+
 // Lazy load scene builders to keep bundle lean
 const sceneLoaders: Record<string, () => Promise<any>> = {
   vaporwave: () => import('./scenes/vaporwave').then(m => m.buildVaporwaveScene),
@@ -19,6 +21,10 @@ export const BabylonCanvas = ({ theme, fftData }: BabylonCanvasProps) => {
   const sceneRef = useRef<Scene | null>(null);
   const rafRef = useRef<number>(0);
   const cleanupRef = useRef<(() => void) | null>(null);
+
+  if (!WEBGL_THEMES.has(theme)) {
+    return null;
+  }
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -89,6 +95,7 @@ export const BabylonCanvas = ({ theme, fftData }: BabylonCanvasProps) => {
 
   return (
     <canvas
+      key={theme}
       ref={canvasRef}
       style={{
         position: 'fixed',

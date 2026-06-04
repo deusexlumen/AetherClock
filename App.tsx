@@ -95,7 +95,7 @@ export const parseAgendaToCalendar = (agenda: string): CalendarItem[] => {
     }
 
     return {
-      id: `item-${idx}-${Date.now()}`,
+      id: `item-${idx}-${time.replace(':', '')}-${title.slice(0, 12).replace(/\W/g, '')}`,
       time,
       title: title || "Scheduled Event",
       vibe,
@@ -260,19 +260,6 @@ const getPreAlarmTime = (alarmTimeStr: string): string => {
   return `${hr.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
 };
 
-const REPUTABLE_YOUTUBE_FALLBACKS: Record<MusicGenre, string> = {
-  auto: "jfKfPfyJRdk",       // Lofi Girl Live radio
-  synthwave: "4xDzrJKXOOY",  // Synthwave radio Live
-  acoustic: "2u_t_v8IeBY",   // Chill acoustic music compilations
-  lofi: "jfKfPfyJRdk",       // Lofi Girl Live
-  rock: "mQD69vY0_D0",       // Classic high quality rock mix
-  classical: "9E6b3swZ44g",  // Peaceful Classical Piano
-  jazz: "3HNJ_t49N_I",       // Relaxing Jazz Lounge
-  pop: "A67ZkAd1dQ0",        // Ultimate pop acoustic covers
-  ambient: "tNkZs56_86s",    // Deep space chilling ambient
-  hiphop: "hHW1oY26kxQ"      // Chilled hiphop instrumentals
-};
-
 const App: React.FC = () => {
   const initialAgenda = `0800 Drop Ava at nursery\n1000 Team meeting\n1200 lunch with Amanda\n1400 call with Jerry`;
 
@@ -325,7 +312,8 @@ const App: React.FC = () => {
   });
   const [volume, setVolume] = useState<number>(() => {
     const saved = localStorage.getItem('lyria_volume');
-    return saved !== null ? parseInt(saved, 10) : 75;
+    const parsed = saved !== null ? parseInt(saved, 10) : 75;
+    return Number.isNaN(parsed) ? 75 : Math.max(0, Math.min(100, parsed));
   });
   const [loudnessMode, setLoudnessMode] = useState<'standard' | 'sunrise_progressive' | 'max_impact'>(() => {
     return (localStorage.getItem('lyria_loudness') as any) || 'standard';
@@ -340,8 +328,10 @@ const App: React.FC = () => {
   const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
 
   const [voiceBriefingConfig, setVoiceBriefingConfig] = useState<VoiceBriefingConfig>(() => {
-    const saved = localStorage.getItem('lyria_voice_briefing');
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('lyria_voice_briefing');
+      if (saved) return JSON.parse(saved);
+    } catch {}
     return {
       enabled: true,
       voiceName: 'Fenrir',
@@ -353,8 +343,10 @@ const App: React.FC = () => {
   });
 
   const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfig>(() => {
-    const saved = localStorage.getItem('lyria_playlist');
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('lyria_playlist');
+      if (saved) return JSON.parse(saved);
+    } catch {}
     return {
       enabled: true,
       trackCount: 3,
@@ -364,8 +356,10 @@ const App: React.FC = () => {
   });
 
   const [llmConfig, setLLMConfig] = useState<LLMConfig>(() => {
-    const saved = localStorage.getItem('lyria_llm');
-    if (saved) return JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('lyria_llm');
+      if (saved) return JSON.parse(saved);
+    } catch {}
     return {
       textModel: 'gemini-3.5-flash',
       ttsModel: 'gemini-3.1-flash-tts-preview'
@@ -384,9 +378,11 @@ const App: React.FC = () => {
   const [isScreenSaverActive, setIsScreenSaverActive] = useState<boolean>(false);
   const [screenSaverTimeout, setScreenSaverTimeout] = useState<number>(() => {
     const saved = localStorage.getItem('lyria_screensaver_timeout');
-    return saved !== null ? parseInt(saved, 10) : 30;
+    const parsed = saved !== null ? parseInt(saved, 10) : 30;
+    return Number.isNaN(parsed) ? 30 : Math.max(5, parsed);
   });
   const screenSaverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetScreenSaverTimerRef = useRef<() => void>(() => {});
 
   // Screen saver logic
   const resetScreenSaverTimer = () => {
@@ -402,17 +398,18 @@ const App: React.FC = () => {
       }
     }, screenSaverTimeout * 1000);
   };
+  resetScreenSaverTimerRef.current = resetScreenSaverTimer;
 
   useEffect(() => {
     const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach(e => window.addEventListener(e, resetScreenSaverTimer));
-    resetScreenSaverTimer();
+    const handler = () => resetScreenSaverTimerRef.current();
+    events.forEach(e => window.addEventListener(e, handler));
+    handler();
     return () => {
-      events.forEach(e => window.removeEventListener(e, resetScreenSaverTimer));
+      events.forEach(e => window.removeEventListener(e, handler));
       if (screenSaverTimerRef.current) clearTimeout(screenSaverTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.status]);
+  }, []);
 
   // TTS Player instance
   const ttsPlayerRef = useRef(new TTSPlayer());
@@ -447,6 +444,7 @@ const App: React.FC = () => {
       analyserRef.current.smoothingTimeConstant = 0.85;
       sourceNodeRef.current.connect(analyserRef.current);
       analyserRef.current.connect(ctx.destination);
+      setAnalyserTick(t => t + 1);
     } catch (err) {
       // Already connected or cross-origin issue
       console.warn('[Audio] Could not connect visualizer:', err);
@@ -457,6 +455,8 @@ const App: React.FC = () => {
   const handleGenerateAndPlayRef = useRef<any>(() => {});
   const startPlaybackSequenceRef = useRef<any>(() => {});
   const handleNextTrackRef = useRef<any>(() => {});
+  const alarmPendingRef = useRef<boolean>(false);
+  const [, setAnalyserTick] = useState<number>(0);
   // Dual-Planner Tabs
   const [plannerTab, setPlannerTab] = useState<'interactive' | 'textarea'>('interactive');
   
@@ -591,7 +591,9 @@ const App: React.FC = () => {
       if (!state.isAlarmActive) return;
       
       const now = new Date();
-      const currentTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const currentTime = `${hours}:${minutes}`;
       const preAlarmTime = getPreAlarmTime(state.alarmTime);
 
       // 1. Pre-warm option (60 seconds before)
@@ -601,6 +603,7 @@ const App: React.FC = () => {
 
       // 2. Main alarm match trigger
       if (currentTime === state.alarmTime) {
+         alarmPendingRef.current = false;
          if (!isOnlineStatus && offlineFallbackEnabled) {
             setState(prev => ({ ...prev, status: 'playing', isAlarmActive: false }));
             playOfflineFallback();
@@ -610,17 +613,21 @@ const App: React.FC = () => {
             return;
          }
 
-         if (isPreWarmEnabled && state.status === 'ready') {
+         if (state.status === 'ready') {
             setState(prev => ({ ...prev, isAlarmActive: false }));
             if (notificationsEnabled) {
               sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
             }
             startPlaybackSequenceRef.current();
          } else if (state.status === 'idle') {
+            setState(prev => ({ ...prev, isAlarmActive: false }));
             if (notificationsEnabled) {
               sendAlarmNotification('AetherClock', 'Generating your broadcast now...');
             }
             handleGenerateAndPlayRef.current(false);
+         } else {
+            // Generation still in progress — auto-trigger when ready
+            alarmPendingRef.current = true;
          }
       }
     };
@@ -628,6 +635,18 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.isAlarmActive, state.status, state.alarmTime, isPreWarmEnabled, isOnlineStatus, offlineFallbackEnabled, notificationsEnabled]);
+
+  // Auto-trigger alarm when generation finishes and alarm time was reached
+  useEffect(() => {
+    if (state.status === 'ready' && alarmPendingRef.current) {
+      alarmPendingRef.current = false;
+      setState(prev => ({ ...prev, isAlarmActive: false }));
+      if (notificationsEnabled) {
+        sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
+      }
+      startPlaybackSequenceRef.current();
+    }
+  }, [state.status, notificationsEnabled]);
 
   // Sync inputs
   const syncCalendarToAgenda = (newCalendar: CalendarItem[]) => {
@@ -750,16 +769,31 @@ const App: React.FC = () => {
         : buildEmbedUrl(resultData.searchedSong.youtubeVideoId || getFallbackVideoId(state.genrePreset));
 
       if (preGenerateOnly) {
-        setState(prev => ({
-          ...prev,
-          status: 'ready',
-          searchedTrack: resultData.searchedSong,
-          youtubeEmbedUrl: embedUrl,
-          playlist,
-          currentTrackIndex: 0,
-          briefingAudioSrc: briefingSrc,
-          lyrics: 'Broadcast Buffer Ready...'
-        }));
+        if (!isYouTube) {
+          const result = await generateSong(resultData.musicalPrompt);
+          const audioUrl = `data:${result.mimeType};base64,${result.audioBase64}`;
+          setState(prev => ({
+            ...prev,
+            status: 'ready',
+            searchedTrack: resultData.searchedSong,
+            audioSrc: audioUrl,
+            playlist: [],
+            currentTrackIndex: 0,
+            briefingAudioSrc: briefingSrc,
+            lyrics: result.lyrics,
+          }));
+        } else {
+          setState(prev => ({
+            ...prev,
+            status: 'ready',
+            searchedTrack: resultData.searchedSong,
+            youtubeEmbedUrl: embedUrl,
+            playlist,
+            currentTrackIndex: 0,
+            briefingAudioSrc: briefingSrc,
+            lyrics: 'Broadcast Buffer Ready...'
+          }));
+        }
         return;
       }
 
@@ -799,6 +833,10 @@ const App: React.FC = () => {
 
   // Start actual playback sequence (briefing -> playlist track 0)
   const startPlaybackSequence = () => {
+    if (state.playbackSource === 'lyria' && state.audioSrc) {
+      setState(prev => ({ ...prev, status: 'playing', isAlarmActive: false }));
+      return;
+    }
     if (state.briefingAudioSrc && voiceBriefingConfig.enabled) {
       setState(prev => ({ ...prev, status: 'playing_briefing' }));
       ttsPlayerRef.current.play(state.briefingAudioSrc, 'audio/wav', () => {
@@ -822,8 +860,16 @@ const App: React.FC = () => {
 
   // Advance to next track in playlist
   const handleNextTrack = () => {
-    if (state.playlist.length <= 1) return;
-    const nextIndex = (state.currentTrackIndex + 1) % state.playlist.length;
+    if (state.playlist.length === 0) return;
+    if (state.playlist.length === 1) {
+      if (youtubePlayerRef.current?.loadVideoById) {
+        youtubePlayerRef.current.loadVideoById(state.playlist[0].youtubeVideoId);
+      }
+      return;
+    }
+    const nextIndex = playlistConfig.shuffle
+      ? getNextTrackIndex(state.currentTrackIndex, state.playlist.length, true)
+      : (state.currentTrackIndex + 1) % state.playlist.length;
     setState(prev => ({
       ...prev,
       currentTrackIndex: nextIndex,

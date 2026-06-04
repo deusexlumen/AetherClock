@@ -12,7 +12,6 @@ export function buildVaporwaveScene(engine: Engine, fftData?: Float32Array): Sce
   const camera = new ArcRotateCamera('cam', -Math.PI / 2, Math.PI / 2.8, 15, new Vector3(0, 1, 0), scene);
   camera.lowerRadiusLimit = 10;
   camera.upperRadiusLimit = 25;
-  camera.attachControl(false);
 
   // Lighting
   new HemisphericLight('hemi', new Vector3(0, 1, 0), scene).intensity = 0.2;
