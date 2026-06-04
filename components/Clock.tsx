@@ -9,8 +9,21 @@ export const Clock: React.FC<ClockProps> = ({ className, isAlarmActive }) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    let interval: ReturnType<typeof setInterval>;
+    let timeout: ReturnType<typeof setTimeout>;
+    const sync = () => {
+      setTime(new Date());
+      const drift = 1000 - (Date.now() % 1000);
+      timeout = setTimeout(() => {
+        setTime(new Date());
+        interval = setInterval(() => setTime(new Date()), 1000);
+      }, drift);
+    };
+    sync();
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, []);
 
   // Ensure double digits for hours and minutes manually to avoid locale quirks
@@ -22,7 +35,7 @@ export const Clock: React.FC<ClockProps> = ({ className, isAlarmActive }) => {
     <div className={`flex items-center justify-center bg-black/40 rounded-lg p-2 sm:p-4 border-2 border-white/5 shadow-inset-screen ${className}`}>
       <div className="font-digital font-black text-4xl sm:text-6xl md:text-8xl tracking-widest text-radio-lit led-text-shadow flex items-center">
         <span>{hours}</span>
-        <span className={`mx-0.5 sm:mx-2 ${seconds ? 'opacity-100' : 'opacity-20 transition-opacity duration-200'}`}>:</span>
+        <span className={`mx-0.5 sm:mx-2 transition-opacity duration-200 ${seconds ? 'opacity-100' : 'opacity-20'}`}>:</span>
         <span>{minutes}</span>
       </div>
       
