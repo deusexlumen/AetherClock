@@ -1,6 +1,13 @@
+<div align="center">
+
 # ⏰ AetherClock
 
-> An AI-powered, retro-styled radio alarm clock that curates thematic YouTube playlists and voice briefings matched to your calendar, weather, and mood. No AI Studio required. Runs entirely in your browser.
+### *An AI-powered, retro-styled radio alarm clock that composes your perfect morning soundtrack.*
+
+[![Live Demo](https://img.shields.io/badge/🔗_Live_Demo-pages.dev-FF6B6B?style=for-the-badge)](https://aetherclock.pages.dev)
+[![GitHub Repo](https://img.shields.io/badge/🔗_GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/deusexlumen/AetherClock)
+
+<br>
 
 [![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?logo=vite)](https://vitejs.dev)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
@@ -8,69 +15,117 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?logo=tailwindcss)](https://tailwindcss.com)
 [![Babylon.js](https://img.shields.io/badge/Babylon.js-v9-FF0000?logo=babylonjs)](https://www.babylonjs.com/)
 [![PWA](https://img.shields.io/badge/PWA-Ready-5A0FC8?logo=pwa)](https://web.dev/progressive-web-apps/)
+[![License](https://img.shields.io/badge/License-MIT-22d3ee)](LICENSE)
 
-![AetherClock Preview](https://via.placeholder.com/800x450/1a1a1a/ff3333?text=AetherClock+Preview)
+<br>
+
+![Preview](https://img.shields.io/badge/🎛️_Retro_Radio_Interface-Cyberpunk_/_Brass_/_Space-1a1a1a?style=for-the-badge&color=ff3333)
+
+</div>
 
 ---
 
-## ✨ Features
+## ✨ What is AetherClock?
 
-### 🎙️ Voice Briefing
-Wake up to a personalized AI-generated voice briefing. Every morning, a synthesized voice tells you:
-- The current time
-- Weather conditions & temperature
-- Your upcoming calendar appointments
-- A custom greeting of your choice
+**AetherClock** is not just an alarm clock — it's a *personal morning DJ*. Instead of a generic beep, it wakes you up with a curated AI-generated broadcast:
 
-*Powered by Google Gemini TTS (`Fenrir`, `Kore`, `Leda` voices).*
+1. 🎙️ **Voice Briefing** — A synthetic voice tells you the time, weather, and your day's agenda
+2. 📻 **Smart Playlist** — Thematic YouTube tracks matched to your mood, weather, and calendar
+3. 🎨 **Immersive Visuals** — 10 retro chassis themes, 3 with live WebGL backgrounds
+4. 📲 **PWA** — Install it, get push notifications, works offline
 
-### 📻 Smart Playlist
-Instead of a single generic alarm tone, AetherClock builds a curated **YouTube playlist** (1–5 tracks) based on:
-- **Weather** (rainy → lo-fi, sunny → upbeat)
-- **Agenda vibe** (meeting → focus, workout → high-energy)
-- **Genre preset** (Synthwave, Jazz, Rock, Classical, Lo-Fi, …)
-- **Time of day** (dawn ambient vs. morning energetic)
+> *"It's like having a radio station that only plays for you, every morning."*
 
-Tracks are discovered in real-time via Google Search Grounding.
+---
 
-### 📲 Progressive Web App (PWA)
-- **Installable** on Android & Desktop Chrome
-- **Offline fallback alarm tone** when no internet is available
-- **Push notifications** when your alarm fires — even if the app is in the background
-- **Service Worker** caches assets for instant load times
+## 🚀 Live Demo
 
-### 🎨 10 Retro Themes (3 with Live WebGL Backgrounds)
-From cyberpunk obsidian to premium brass mahogany. Every theme dynamically morphs the entire UI — colors, glows, scanlines, sonar grids, and hardware decals.
+**→ [https://aetherclock.pages.dev](https://aetherclock.pages.dev)**
 
-**Premium themes** feature full-screen animated **Babylon.js WebGL** scenes that react to your music's FFT data in real time:
+No installation required. Open it in your browser, set an alarm, and experience your first AI-curated wake-up.
 
-| Theme | Vibe | Background |
-|---|---|---|
-| Obsidian Cyberpunk | Red neon, dystopian | CSS gradients |
-| Sandalwood Amber | Warm, vintage | CSS gradients |
-| Futuristic Cobalt | Blue tech | CSS gradients |
-| **★ Vaporwave Cyber-Luxe** | Purple & magenta, retro sun | 🌴 **WebGL** — animated grid floor, rotating sun, bloom |
-| **★ Antique Mahogany Brass** | Brass screws, wood | CSS gradients |
-| **★ Reactor Toxic-Green** | Biohazard stripes | CSS gradients |
-| **★ Space Odyssey** | Deep space, orbital ring | 🌌 **WebGL** — 3,000 star particles, rotating torus, planet |
-| **★ Royal Velvet** | Gold filigree, crowns | CSS gradients |
-| **★ Sonar Marine** | Green radar, depth fog | 🛸 **WebGL** — sonar ping rings, rising bubbles, depth fog |
-| Ivory Coast Emerald | Light mode, clean | CSS gradients |
+---
 
-### ⚙️ Deep Customization
-Every feature is toggleable and persisted in `localStorage`:
+## 🎬 Features in Detail
 
-| Setting | Options |
-|---|---|
-| Voice Briefing | On/Off, voice selector, custom greeting, weather/agenda/time inclusion |
-| Playlist | On/Off, track count (1–5), shuffle, crossfade duration |
-| Loudness | Standard, Sunrise Progressive (gentle ramp-up), Max Impact Shock |
-| Pre-Warm Engine | Generates content 60s before alarm |
-| Playback Source | YouTube (primary) or Lyria AI music generation (experimental) |
-| Theme | 10 chassis presets |
-| Blacklist | Forbidden artists/keywords |
-| Push Notifications | System notifications on alarm |
-| Offline Fallback | Local tone when disconnected |
+### 🎙️ AI Voice Briefing
+Wake up to a personalized spoken briefing synthesized via Google Gemini TTS. Choose from three voices:
+- **`Fenrir`** — Deep, commanding male
+- **`Kore`** — Clear, bright female  
+- **`Leda`** — Warm, soothing female
+
+The briefing covers:
+- ⏰ Current time
+- 🌤️ Weather conditions & temperature (via GPS + Open-Meteo)
+- 📅 Your upcoming calendar appointments
+- 💬 A custom greeting of your choice
+
+### 📻 Smart Playlist Curation
+Instead of one alarm tone, AetherClock builds a **1–5 track YouTube playlist** in real-time, considering:
+
+| Context | Music Adaptation |
+|---------|-----------------|
+| ☀️ Sunny weather | Upbeat, energetic tracks |
+| 🌧️ Rainy weather | Lo-fi, ambient, acoustic |
+| 💼 Morning meetings | Focus, instrumental |
+| 🏋️ Workout scheduled | High-energy rock / electronic |
+| 🌙 Night shift | Mellow jazz, chillhop |
+| 🎚️ Genre preset | Synthwave, Classical, Rock, Jazz, Pop, Ambient, Hip-Hop |
+
+Powered by **Google Gemini with Search Grounding** — finds real, embeddable YouTube tracks, not hallucinated songs.
+
+### 🎨 10 Retro Themes (3 with Live WebGL)
+
+Every theme morphs the entire UI — colors, glows, scanlines, hardware decals, and typography.
+
+| Theme | Vibe | Background Engine |
+|-------|------|-------------------|
+| Obsidian Cyberpunk | Red neon, dystopian | CSS gradients + shadows |
+| Sandalwood Amber | Warm, vintage wood | CSS gradients |
+| Futuristic Cobalt | Blue tech, clean | CSS gradients |
+| **★ Vaporwave Cyber-Luxe** | Purple & magenta, retro sun | 🌴 **WebGL** — animated grid floor, rotating sun, post-processing bloom |
+| **★ Antique Mahogany Brass** | Brass screws, wood grain | CSS gradients + rivet decals |
+| **★ Reactor Toxic-Green** | Biohazard stripes, warning labels | CSS gradients + hazard patterns |
+| **★ Space Odyssey** | Deep space, orbital ring, planet | 🌌 **WebGL** — 3,000 star particles, rotating torus, nebula lighting |
+| **★ Royal Velvet** | Gold filigree, crown accents | CSS gradients + border inlays |
+| **★ Sonar Marine** | Green radar, depth readouts | 🛸 **WebGL** — sonar ping rings, rising bubbles, depth fog |
+| Ivory Coast Emerald | Light mode, clean emerald | CSS gradients |
+
+> **WebGL themes** use Babylon.js with real-time FFT audio reactivity (when playing non-YouTube audio).
+
+### 📲 Progressive Web App
+
+| Feature | Status |
+|---------|--------|
+| ⬇️ Installable (Android + Desktop) | ✅ |
+| 🔕 Offline fallback alarm tone | ✅ |
+| 🔔 Push notifications on alarm | ✅ |
+| ⚡ Service Worker asset caching | ✅ |
+| 📴 Works without internet after install | ✅ (fallback tone) |
+
+---
+
+## 🛠️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        BROWSER                              │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────────────┐  │
+│  │  React 19   │  │  Vite Build  │  │  Service Worker   │  │
+│  │  (App.tsx)  │  │  (dist/)     │  │  (Cache + Push)   │  │
+│  └──────┬──────┘  └──────────────┘  └───────────────────┘  │
+│         │                                                   │
+│  ┌──────┴──────────────────────────────────────────────┐   │
+│  │              EXTERNAL APIs (Client-Side)             │   │
+│  │  • Google Gemini (GenAI + TTS + Search Grounding)   │   │
+│  │  • Open-Meteo (Weather, no API key)                 │   │
+│  │  • YouTube IFrame API (Playback)                    │   │
+│  │  • Browser Geolocation (GPS)                        │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**No backend required.** All AI calls go directly from the browser to Google's API. Your Gemini API key is injected at build time via Vite.
 
 ---
 
@@ -78,7 +133,7 @@ Every feature is toggleable and persisted in `localStorage`:
 
 ### Prerequisites
 - [Node.js](https://nodejs.org) ≥ 18
-- A [Google Gemini API key](https://aistudio.google.com/app/apikey)
+- A [Google Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
 
 ### 1. Clone & Install
 ```bash
@@ -87,134 +142,78 @@ cd AetherClock
 npm install
 ```
 
-### 2. Configure API Key
+### 2. Configure Environment
 ```bash
 cp .env.example .env.local
-# Edit .env.local and set your key:
+# Edit .env.local:
 # GEMINI_API_KEY=your_key_here
 ```
 
-### 3. Run Dev Server
+### 3. Develop
 ```bash
 npm run dev
 ```
-Open `http://localhost:3000`
+→ Opens at `http://localhost:3000`
 
 ### 4. Build for Production
 ```bash
 npm run build
-npm run preview
 ```
+→ Outputs to `dist/` — ready for Cloudflare Pages, Netlify, or any static host.
 
 ---
 
-## 🛠️ Tech Stack
+## 🎛️ Settings & Customization
 
-| Layer | Technology |
-|---|---|
-| Framework | React 19 (Hooks + Refs) |
-| Language | TypeScript 5.8 |
-| Build | Vite 6 |
-| Styling | Tailwind CSS (CDN) + CSS Custom Properties |
-| Icons | Lucide React |
-| AI SDK | `@google/genai` |
-| 3D Engine | `@babylonjs/core` (WebGL2) |
-| Weather | Open-Meteo (free, no key) |
-| Fonts | Orbitron, Share Tech Mono |
+All preferences are persisted in `localStorage` and survive reloads.
 
----
-
-## 📖 How It Works
-
-```
-User sets alarm (e.g. 07:00)
-        │
-        ▼
-┌─────────────────────┐
-│  Pre-Warm (06:59)   │  ◄── 60s before alarm
-│  - Search songs via   │
-│    Gemini + Grounding │
-│  - Generate TTS       │
-│    briefing           │
-│  - Build playlist     │
-└─────────────────────┘
-        │
-        ▼
-┌─────────────────────┐
-│  Alarm (07:00)      │
-│  - Play voice       │
-│    briefing         │
-│  - Start playlist   │
-│    track 1          │
-│  - Advance track    │
-│    on end           │
-└─────────────────────┘
-```
-
-### Offline Path
-If the device has no internet connection at alarm time and **Offline Fallback** is enabled, AetherClock bypasses all AI/YouTube logic and immediately plays a local alarm tone via the Web Audio API.
+| Category | Options |
+|----------|---------|
+| **Voice Briefing** | On/Off, voice (`Fenrir`/`Kore`/`Leda`), custom greeting, include weather/agenda/time |
+| **Playlist** | On/Off, track count (1–5), shuffle, crossfade |
+| **Loudness** | Standard · Sunrise Progressive (gentle ramp) · Max Impact Shock |
+| **Pre-Warm Engine** | Generates content 60s before alarm time |
+| **Playback Source** | YouTube (fast) · Lyria AI (generates unique music, slower) |
+| **Theme** | 10 visual presets |
+| **Blacklist** | Comma-separated artists/keywords to avoid |
+| **Notifications** | System push notifications on alarm trigger |
+| **Offline Fallback** | Local synthesized tone when disconnected |
 
 ---
 
-## 📱 Install as App (PWA)
+## 🧪 Experimental: Lyria Mode
+
+Switch the **Playback Source** from YouTube to **LYRIA** to trigger actual AI music generation via Google's Lyria model. If music generation fails, it gracefully falls back to Gemini TTS with instrumental styling.
+
+> ⚠️ Requires a Gemini API key with Lyria access enabled.
+
+---
+
+## 📱 PWA Installation
 
 ### Android / Chrome Desktop
-1. Open AetherClock in Chrome
-2. Tap the **"Install"** button in the banner (or use the browser menu → "Install AetherClock")
-3. The app appears on your home screen / desktop and runs standalone
+1. Open [aetherclock.pages.dev](https://aetherclock.pages.dev) in Chrome
+2. Tap **"Install AetherClock"** in the banner (or ⋮ → Install)
+3. App appears on home screen / desktop — runs standalone, no browser chrome
 
 ### Enable Notifications
-In the **Settings** panel, toggle **Push Notifications**. Chrome will ask for permission. Once granted, you'll receive a system notification when your alarm fires — even if the app is closed.
-
----
-
-## 🎛️ Settings Deep Dive
-
-All settings are automatically saved to `localStorage` and survive page reloads.
-
-### Voice Briefing
-- **Enabled**: Master toggle
-- **Voice**: `Fenrir` (deep male), `Kore` (clear female), `Leda` (warm female)
-- **Custom Greeting**: e.g. `"Rise and shine, Commander"`
-- **Include Weather / Agenda / Time**: Choose what the briefing covers
-
-### Playlist
-- **Enabled**: Master toggle
-- **Track Count**: How many songs to curate (1–5)
-- **Shuffle**: Randomize playback order
-- **Crossfade**: Simulated crossfade duration between tracks
-
-### System
-- **Theme**: 10 visual chassis presets
-- **Volume**: 0–100%
-- **Loudness Mode**:
-  - *Standard*: Fixed volume
-  - *Sunrise Progressive*: Gentle 3s ramp-up from 10% → target
-  - *Max Impact Shock*: 100% immediate blast
-- **Pre-Warm Engine**: Start generation 60s before alarm
-- **Blacklist**: Comma-separated artists/keywords to avoid
-
----
-
-## 🧪 Experimental Features
-
-### Lyria Music Generation
-In the **Playback Source** toggle (top right of the station dial board), you can switch from **YouTube** to **LYRIA**. This triggers actual AI music generation via Google's Lyria model with TTS fallback. It's slower and more API-intensive, but generates truly unique tracks.
-
-> ⚠️ Requires a Gemini API key with Lyria access.
+1. Open **Settings** panel in the app
+2. Toggle **Push Notifications**
+3. Grant browser permission
+4. Receive system notifications even when the app is closed
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] AI Studio decoupling
-- [x] YouTube-first playback
-- [x] Smart playlist curation
-- [x] Voice briefing (TTS)
-- [x] PWA + Service Worker
-- [x] Offline fallback tone
+- [x] AI Studio decoupling (standalone deployment)
+- [x] YouTube-first playback engine
+- [x] Smart playlist curation (1–5 tracks)
+- [x] Voice briefing (Gemini TTS)
+- [x] PWA + Service Worker + offline fallback
 - [x] Push notifications
 - [x] Babylon.js WebGL animated themes (Vaporwave, Space, Submarine)
+- [x] 10 retro chassis presets
 - [ ] Background alarm via Web Push (serverless periodic sync)
 - [ ] Custom user-uploaded alarm tones
 - [ ] Spotify / Apple Music integration
@@ -223,11 +222,28 @@ In the **Playback Source** toggle (top right of the station dial board), you can
 
 ---
 
+## 🧰 Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | React 19 (Hooks + Refs) |
+| Language | TypeScript 5.8 |
+| Build Tool | Vite 6 |
+| Styling | Tailwind CSS (CDN) + CSS Custom Properties |
+| Icons | Lucide React |
+| AI SDK | `@google/genai` |
+| 3D Engine | `@babylonjs/core` (WebGL2, lazy-loaded) |
+| Weather | Open-Meteo (free, no key) |
+| Fonts | Orbitron, Share Tech Mono (Google Fonts) |
+
+---
+
 ## 🤝 Credits
 
-- **Weather data**: [Open-Meteo](https://open-meteo.com/)
+- **Weather Data**: [Open-Meteo](https://open-meteo.com/)
 - **AI / Search Grounding**: [Google Gemini](https://deepmind.google/technologies/gemini/)
-- **Music curation**: YouTube embeds + Google Search
+- **Music Playback**: YouTube IFrame API
+- **3D Engine**: [Babylon.js](https://www.babylonjs.com/)
 - **Fonts**: Orbitron & Share Tech Mono via Google Fonts
 
 ---
@@ -238,6 +254,10 @@ MIT — feel free to fork, remix, and build your own wake-up experience.
 
 ---
 
-<p align="center">
-  <sub>Built with insomnia and too much synthwave.</sub>
-</p>
+<div align="center">
+
+**[🌐 Live Demo](https://aetherclock.pages.dev)** · **[📂 GitHub](https://github.com/deusexlumen/AetherClock)**
+
+<sub>Built with insomnia, synthwave, and too much coffee.</sub>
+
+</div>
