@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { PlaylistTrack } from '../types';
 import { SkipBack, SkipForward, Radio } from 'lucide-react';
 
@@ -11,6 +11,18 @@ interface Props {
 }
 
 export const PlaylistViewer: React.FC<Props> = ({ playlist, currentIndex, onNext, onPrev, isPlayingBriefing }) => {
+  const prevIndexRef = useRef(currentIndex);
+  const [flashWrap, setFlashWrap] = useState(false);
+
+  useEffect(() => {
+    if (currentIndex === 0 && prevIndexRef.current === playlist.length - 1 && playlist.length > 1) {
+      setFlashWrap(true);
+      const t = setTimeout(() => setFlashWrap(false), 1500);
+      return () => clearTimeout(t);
+    }
+    prevIndexRef.current = currentIndex;
+  }, [currentIndex, playlist.length]);
+
   if (playlist.length === 0) return null;
 
   return (
@@ -19,8 +31,8 @@ export const PlaylistViewer: React.FC<Props> = ({ playlist, currentIndex, onNext
         <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-1">
           <Radio className="w-2.5 h-2.5 text-radio-lit" /> Playlist Queue
         </span>
-        <span className="text-[8px] font-digital text-radio-lit/70">
-          {currentIndex + 1} / {playlist.length}
+        <span className={`text-[8px] font-digital transition-colors duration-300 ${flashWrap ? 'text-yellow-400' : 'text-radio-lit/70'}`}>
+          {flashWrap ? 'RESTARTING PLAYLIST' : `${currentIndex + 1} / ${playlist.length}`}
         </span>
       </div>
 

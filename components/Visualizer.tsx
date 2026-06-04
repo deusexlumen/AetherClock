@@ -57,6 +57,9 @@ export const Visualizer: React.FC<Props> = ({ analyser, isActive, status, genre 
     gradient.addColorStop(1, 'rgba(255, 150, 50, 1)');
 
     const draw = () => {
+      if (window.devicePixelRatio !== dprRef.current) {
+        resize();
+      }
       const width = sizeRef.current.width;
       const height = sizeRef.current.height;
       ctx.clearRect(0, 0, width, height);

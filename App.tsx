@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock } from './components/Clock';
 import { Visualizer } from './components/Visualizer';
 import { PlaylistViewer } from './components/PlaylistViewer';
@@ -437,6 +437,16 @@ const App: React.FC = () => {
       return; // Already connected
     }
 
+    // Clean up any previous connection to avoid "already connected" errors on recycled elements
+    if (sourceNodeRef.current) {
+      try { sourceNodeRef.current.disconnect(); } catch {}
+      sourceNodeRef.current = null;
+    }
+    if (analyserRef.current) {
+      try { analyserRef.current.disconnect(); } catch {}
+      analyserRef.current = null;
+    }
+
     try {
       sourceNodeRef.current = ctx.createMediaElementSource(audioElement);
       analyserRef.current = ctx.createAnalyser();
@@ -859,7 +869,7 @@ const App: React.FC = () => {
   };
 
   // Advance to next track in playlist
-  const handleNextTrack = () => {
+  const handleNextTrack = useCallback(() => {
     if (state.playlist.length === 0) return;
     if (state.playlist.length === 1) {
       if (youtubePlayerRef.current?.loadVideoById) {
@@ -875,9 +885,9 @@ const App: React.FC = () => {
       currentTrackIndex: nextIndex,
       youtubeEmbedUrl: buildEmbedUrl(prev.playlist[nextIndex].youtubeVideoId)
     }));
-  };
+  }, [state.playlist.length, state.currentTrackIndex, playlistConfig.shuffle]);
 
-  const handlePrevTrack = () => {
+  const handlePrevTrack = useCallback(() => {
     if (state.playlist.length <= 1) return;
     const prevIndex = state.currentTrackIndex === 0 ? state.playlist.length - 1 : state.currentTrackIndex - 1;
     setState(prev => ({
@@ -885,7 +895,7 @@ const App: React.FC = () => {
       currentTrackIndex: prevIndex,
       youtubeEmbedUrl: buildEmbedUrl(prev.playlist[prevIndex].youtubeVideoId)
     }));
-  };
+  }, [state.playlist.length, state.currentTrackIndex]);
 
   // Sync refs after function definitions (avoids TDZ)
   handleGenerateAndPlayRef.current = handleGenerateAndPlay;
