@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lyria-radio-v1';
+const CACHE_NAME = 'lyria-radio-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
