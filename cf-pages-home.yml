@@ -1,0 +1,378 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - navigation [ref=e5]:
+        - link [ref=e6] [cursor=pointer]:
+          - /url: /
+          - img [ref=e8]
+        - generic [ref=e13]:
+          - link "Docs" [ref=e15] [cursor=pointer]:
+            - /url: https://developers.cloudflare.com/pages
+          - link "Discord" [ref=e17] [cursor=pointer]:
+            - /url: https://discord.gg/cloudflaredev
+        - generic [ref=e19]:
+          - img "Search icon (depiction of a magnifying glass)" [ref=e21]
+          - textbox "Search Cloudflare" [ref=e23]
+        - generic [ref=e24]:
+          - link "Log in" [ref=e26] [cursor=pointer]:
+            - /url: https://dash.cloudflare.com/login?redirect_uri=https%3A%2F%2Fdash.cloudflare.com%2F%3Faccount%3Dpages
+          - link "Sign up" [ref=e28] [cursor=pointer]:
+            - /url: https://dash.cloudflare.com/sign-up/workers-and-pages
+    - main [ref=e29]:
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - heading "Build fast sites. In record time." [level=1] [ref=e33]:
+            - text: Build
+            - emphasis [ref=e34]: fast
+            - text: sites.
+            - text: In record time.
+          - paragraph [ref=e36]: Cloudflare Pages is a JAMstack platform for frontend developers to collaborate and deploy websites.
+          - generic [ref=e37]:
+            - link "Sign Up" [ref=e39] [cursor=pointer]:
+              - /url: https://dash.cloudflare.com/sign-up/workers-and-pages
+            - link "Read docs" [ref=e41] [cursor=pointer]:
+              - /url: https://developers.cloudflare.com/pages
+          - list [ref=e43]:
+            - listitem [ref=e44]:
+              - strong [ref=e45]: Developer-focused
+              - text: with effortless Git integration.
+            - listitem [ref=e46]:
+              - strong [ref=e47]: Advanced collaboration
+              - text: built-in with unlimited seats.
+            - listitem [ref=e48]:
+              - strong [ref=e49]: Unmatched performance
+              - text: on Cloudflare’s edge network.
+            - listitem [ref=e50]:
+              - strong [ref=e51]: Dynamic functionality
+              - text: through
+              - link "integration with Cloudflare Workers" [ref=e52] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/platform/functions
+              - text: .
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - img
+          - generic:
+            - code [ref=e56]: 4847bcf initial commit
+            - code [ref=e58]: d7f7106 two-column layout
+            - code [ref=e60]: 6da7c6f add navigation menu
+            - code [ref=e62]: 218f7de add search
+            - code [ref=e64]: ab27e9d release 1.0.0
+          - generic:
+            - button "↻ Replay"
+      - generic [ref=e66]:
+        - heading "Grab your repo, and go." [level=2] [ref=e67]
+        - generic [ref=e68]:
+          - img [ref=e80]:
+            - generic [ref=e90]:
+              - generic [ref=e91]: Install Cloudflare Pages
+              - generic [ref=e92]: Where do you want to install Cloudflare Pages?
+              - generic [ref=e96]: github-username
+            - generic [ref=e98]:
+              - generic [ref=e99]: Install & Authorize Cloudflare Pages
+              - generic [ref=e102]: Install & Authorize
+              - generic [ref=e103]: Cancel
+          - generic [ref=e105]:
+            - generic [ref=e106]:
+              - link "Get started with GitHub" [ref=e107] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/get-started
+                - img [ref=e108]
+              - link "Get started with GitLab" [ref=e110] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/get-started
+                - img [ref=e111]
+            - generic [ref=e119]:
+              - paragraph [ref=e120]: "Frontend developers want to build fast and beautiful sites, not play system integrator: bogged down by configuring build systems, setting up environments, and keeping production up to date."
+              - paragraph [ref=e121]:
+                - text: With Pages, you can connect your GitHub or GitLab account. After that, it’s just
+                - strong [ref=e122]: git push
+                - text: — we’ll build and deploy for you.
+        - generic [ref=e123]:
+          - generic [ref=e125]:
+            - paragraph [ref=e126]:
+              - text: With deep Git integration, Cloudflare Pages works the way developers work. Just tell us your build command (e.g.
+              - strong [ref=e127]: npm run build
+              - text: ) and we’ll take care of the rest, logs included.
+            - paragraph [ref=e128]: "Check out our 3-minute guides for common frameworks including React, Vue, Gatsby, and Hugo:"
+            - generic [ref=e129]:
+              - link "React" [ref=e130] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/how-to/deploy-a-react-application
+                - img [ref=e131]
+                - generic [ref=e136]: React
+              - link "Vue" [ref=e137] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/how-to/deploy-a-vue-application
+                - img [ref=e138]
+                - generic [ref=e141]: Vue
+              - link "Gatsby" [ref=e142] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/how-to/deploy-a-gatsby-site
+                - img [ref=e143]
+                - generic [ref=e145]: Gatsby
+              - link "Hugo" [ref=e146] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/how-to/deploy-a-hugo-site
+                - img [ref=e147]
+                - generic [ref=e149]: Hugo
+          - img [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e173]: Details
+              - generic [ref=e174]: Cloudflare Pages
+              - generic [ref=e175]: All checks have passed
+              - generic [ref=e176]: Deploy completed
+              - generic [ref=e177]: 1 successful check
+              - generic [ref=e179]: github-username
+              - generic [ref=e180]: repo-name
+              - generic [ref=e186]: main
+              - generic [ref=e187]: +
+              - generic [ref=e189]: github-username
+              - generic [ref=e190]: Initial commit
+              - generic [ref=e195]: Download
+      - generic [ref=e200]:
+        - blockquote [ref=e201]:
+          - paragraph [ref=e202]: “ Cloudflare Pages supporting Git integration for automated deployments is exciting. I love spending more time on product and less time setting up and fighting infrastructure. ”
+        - generic [ref=e203]:
+          - figure [ref=e204]:
+            - img "Outsmartly" [ref=e205]
+          - generic [ref=e216]:
+            - generic [ref=e217]: Jay Phelps
+            - generic [ref=e218]: Co-founder, Outsmartly
+      - generic [ref=e220]:
+        - heading "Building a site is a team sport." [level=2] [ref=e221]
+        - generic [ref=e222]:
+          - generic [ref=e223]:
+            - generic [ref=e236]:
+              - img [ref=e238]
+              - img [ref=e243]
+              - img [ref=e250]
+              - img [ref=e260]
+              - img [ref=e272]
+            - generic:
+              - button "↻ Replay"
+            - generic:
+              - generic [ref=e278]: I’ll add a nav in the next version.
+              - generic [ref=e279]: Maybe we should add search?
+              - generic [ref=e280]: Looks great! Love the layout.
+          - generic [ref=e282]:
+            - paragraph [ref=e283]: Websites are built through collaboration between designers, engineers, writers, and more. Cloudflare Pages makes it effortless to satisfy each group, so you can iterate quickly, and save time on coordination.
+            - list [ref=e284]:
+              - listitem [ref=e285]:
+                - strong [ref=e286]: "Preview early, preview often:"
+                - text: automatically generated links for every commit make it easy to get feedback on the final result.
+              - listitem [ref=e287]:
+                - strong [ref=e288]: "Unlimited seats for free:"
+                - text: additional collaborators shouldn’t break the bank. With Pages, you can add them all for free.
+              - listitem [ref=e289]:
+                - strong [ref=e290]: "Preview control:"
+                - text: don’t post your drafts to the web. With Cloudflare Access integration, you have granular control over who’s accessing your previews.
+              - listitem [ref=e291]:
+                - strong [ref=e292]: "Built-in, free web analytics:"
+                - text: Get real-time insight into your page with privacy-first analytics that you can share with your team.
+      - generic [ref=e295]:
+        - blockquote [ref=e296]:
+          - paragraph [ref=e297]: “ Cloudflare Pages makes it dead simple to deploy our static websites and to collaborate within our team as we do so. Features such as shareable preview links with every commit and pull request, along with the Git integration, fit in seamlessly with our dev workflow. ”
+        - generic [ref=e298]:
+          - figure [ref=e299]:
+            - img "Envoy" [ref=e300]
+          - generic [ref=e304]:
+            - generic [ref=e305]: Matt Harris
+            - generic [ref=e306]: Head of Workplace and Technology, Envoy
+      - generic [ref=e308]:
+        - heading "Speed, security, and scalability? Our job, not yours." [level=2] [ref=e309]:
+          - text: Speed, security, and scalability?
+          - text: Our job, not yours.
+        - generic [ref=e310]:
+          - img "Global network" [ref=e311]
+          - img "Infinite scaling" [ref=e312]
+        - generic [ref=e314]:
+          - paragraph [ref=e315]: Making a beautiful well designed site is only half a web developer’s job. You also want it to be secure, fast, and scalable. Cloudflare Pages makes it easy to check those boxes. We’ll take care of the infrastructure, so you can focus on design and content.
+          - list [ref=e316]:
+            - listitem [ref=e317]:
+              - strong [ref=e318]: "Fastest network:"
+              - text: run your site on the Cloudflare edge, milliseconds from end users – up to 115% faster than competing platforms.
+            - listitem [ref=e319]:
+              - strong [ref=e320]: "Incredibly scalable:"
+              - text: with one of the world’s largest networks, Cloudflare can absorb traffic from the most visited sites.
+            - listitem [ref=e321]:
+              - strong [ref=e322]: "Always secure:"
+              - text: SSL works out of the box, so you never have to worry about provisioning certificates.
+            - listitem [ref=e323]:
+              - strong [ref=e324]: "Stay ahead of the curve:"
+              - text: support for the latest web standards with HTTP/3, QUIC, image compression out of the box, and more.
+      - generic [ref=e327]:
+        - blockquote [ref=e328]:
+          - paragraph [ref=e329]: “ Because the new Dig Inn ordering experience runs on Cloudflare Workers, we never have to worry about a large spike in traffic or orders bringing down the system and causing a revenue loss. Since all of our code lives on the distributed Cloudflare network, customers can load the site and order without latency. We no longer worry about a lunch or dinner rush causing issues. ”
+        - generic [ref=e330]:
+          - figure [ref=e331]:
+            - img "DIG" [ref=e332]
+          - generic [ref=e334]:
+            - generic [ref=e335]: Matt Weinberg
+            - generic [ref=e336]: Co-founder & President of Technology, Happy Cog, developers of Dig
+      - generic [ref=e339]:
+        - generic [ref=e340]:
+          - generic [ref=e341]:
+            - heading "Free" [level=2] [ref=e342]
+            - generic [ref=e344]:
+              - generic [ref=e345]: $
+              - text: "0"
+          - list [ref=e347]:
+            - listitem [ref=e348]:
+              - generic [ref=e349]: "1"
+              - text: build at a time
+            - listitem [ref=e350]:
+              - generic [ref=e351]: "500"
+              - text: builds per month
+            - listitem [ref=e352]:
+              - generic [ref=e353]: "100"
+              - text: custom domains per project
+            - listitem [ref=e354]: Unlimited sites
+            - listitem [ref=e355]: Unlimited static requests
+            - listitem [ref=e356]: Unlimited bandwidth
+          - link "Sign Up" [ref=e358] [cursor=pointer]:
+            - /url: https://dash.cloudflare.com/sign-up/workers-and-pages
+        - generic [ref=e359]:
+          - generic [ref=e360]:
+            - heading "Pro" [level=2] [ref=e361]
+            - generic [ref=e363]:
+              - generic [ref=e364]: $
+              - text: 20/mo billed annually
+            - generic [ref=e366]:
+              - generic [ref=e367]: $
+              - text: 25/mo billed monthly
+          - list [ref=e369]:
+            - listitem [ref=e370]:
+              - generic [ref=e371]: "5"
+              - text: concurrent builds
+            - listitem [ref=e372]:
+              - generic [ref=e373]: 5,000
+              - text: builds per month
+            - listitem [ref=e374]:
+              - generic [ref=e375]: "250"
+              - text: custom domains per project
+            - listitem [ref=e376]: Unlimited sites
+            - listitem [ref=e377]: Unlimited static requests
+            - listitem [ref=e378]: Unlimited bandwidth
+          - link "Sign Up" [ref=e380] [cursor=pointer]:
+            - /url: https://dash.cloudflare.com/sign-up/workers-and-pages
+        - generic [ref=e381]:
+          - generic [ref=e382]:
+            - heading "Business" [level=2] [ref=e383]
+            - generic [ref=e385]:
+              - generic [ref=e386]: $
+              - text: 200/mo billed annually
+            - generic [ref=e388]:
+              - generic [ref=e389]: $
+              - text: 250/mo billed monthly
+          - list [ref=e391]:
+            - listitem [ref=e392]:
+              - generic [ref=e393]: "20"
+              - text: concurrent builds
+            - listitem [ref=e394]:
+              - generic [ref=e395]: 20,000
+              - text: builds per month
+            - listitem [ref=e396]:
+              - generic [ref=e397]: "500"
+              - text: custom domains per project
+            - listitem [ref=e398]: Unlimited sites
+            - listitem [ref=e399]: Unlimited static requests
+            - listitem [ref=e400]: Unlimited bandwidth
+          - link "Sign Up" [ref=e402] [cursor=pointer]:
+            - /url: https://dash.cloudflare.com/sign-up/workers-and-pages
+    - contentinfo [ref=e403]:
+      - generic [ref=e404]:
+        - link "Pages logo" [ref=e406] [cursor=pointer]:
+          - /url: https://pages.cloudflare.com
+          - img "Pages logo" [ref=e407]
+        - generic [ref=e408]:
+          - heading "Product" [level=2] [ref=e409]
+          - list [ref=e410]:
+            - listitem [ref=e411]:
+              - link "Cloudflare Pages" [ref=e412] [cursor=pointer]:
+                - /url: https://pages.cloudflare.com
+            - listitem [ref=e413]:
+              - link "Announcement" [ref=e414] [cursor=pointer]:
+                - /url: https://blog.cloudflare.com/cloudflare-pages
+            - listitem [ref=e415]:
+              - link "Pricing" [ref=e416] [cursor=pointer]:
+                - /url: https://pages.cloudflare.com/#pricing
+            - listitem [ref=e417]:
+              - link "Cloudflare Workers" [ref=e418] [cursor=pointer]:
+                - /url: https://workers.cloudflare.com
+        - generic [ref=e419]:
+          - heading "Docs" [level=2] [ref=e420]
+          - list [ref=e421]:
+            - listitem [ref=e422]:
+              - link "Getting started" [ref=e423] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/getting-started
+            - listitem [ref=e424]:
+              - link "Deployment setup" [ref=e425] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/how-to
+            - listitem [ref=e426]:
+              - link "Tutorials" [ref=e427] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/tutorials
+            - listitem [ref=e428]:
+              - link "Migrations" [ref=e429] [cursor=pointer]:
+                - /url: https://developers.cloudflare.com/pages/migrations
+        - generic [ref=e430]:
+          - heading "Help" [level=2] [ref=e431]
+          - list [ref=e432]:
+            - listitem [ref=e433]:
+              - link "Status" [ref=e434] [cursor=pointer]:
+                - /url: https://www.cloudflarestatus.com/
+            - listitem [ref=e435]:
+              - link "Discord" [ref=e436] [cursor=pointer]:
+                - /url: https://discord.gg/cloudflaredev
+            - listitem [ref=e437]:
+              - link "Support" [ref=e438] [cursor=pointer]:
+                - /url: https://support.cloudflare.com/hc/en-us/articles/200172476-Contacting-Cloudflare-Support
+            - listitem [ref=e439]:
+              - link "Twitter" [ref=e440] [cursor=pointer]:
+                - /url: https://twitter.com/CloudflareDev
+      - generic [ref=e442]:
+        - text: © 2026 Cloudflare, Inc. ·
+        - link "Privacy" [ref=e443] [cursor=pointer]:
+          - /url: https://www.cloudflare.com/privacypolicy/
+        - text: ·
+        - link "Terms" [ref=e444] [cursor=pointer]:
+          - /url: https://www.cloudflare.com/website-terms/
+        - text: ·
+        - button "Cookie-Einstellungen" [ref=e447] [cursor=pointer]
+  - region "Cookie-Banner" [ref=e449]:
+    - alertdialog "Datenschutz" [ref=e450]:
+      - generic [ref=e452]:
+        - paragraph [ref=e455]: Wenn Sie auf „Alle Cookies akzeptieren“ klicken, stimmen Sie der Speicherung von Cookies auf Ihrem Gerät zu, um die Websitenavigation zu verbessern, die Websitenutzung zu analysieren und unsere Marketingbemühungen zu unterstützen.
+        - generic [ref=e457]:
+          - button "Cookie-Einstellungen" [active] [ref=e458] [cursor=pointer]
+          - button "Alle ablehnen" [ref=e459] [cursor=pointer]
+          - button "Alle Cookies akzeptieren" [ref=e460] [cursor=pointer]
+      - button "Schließen" [ref=e462] [cursor=pointer]
