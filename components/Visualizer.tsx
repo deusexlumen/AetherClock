@@ -146,7 +146,7 @@ export const Visualizer: React.FC<Props> = ({ analyser, isActive, status, genre 
     };
   }, [analyser, isActive, genre]);
 
-  if (status === 'generating_prompt' || status === 'generating_briefing' || status === 'generating_music') {
+  if (status === 'generating_prompt' || status === 'generating_briefing') {
     return (
       <div className="w-full h-full flex items-center justify-center">
         <div className="flex items-center gap-2 text-radio-lit font-mono text-xs uppercase tracking-widest animate-pulse">

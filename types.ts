@@ -54,9 +54,7 @@ export interface PlaylistConfig {
   crossfadeSeconds: number;
 }
 
-export type PlaybackSource = 'youtube' | 'lyria';
-
-export type AppStatus = 'idle' | 'generating_prompt' | 'generating_music' | 'generating_briefing' | 'ready' | 'playing_briefing' | 'playing' | 'error';
+export type AppStatus = 'idle' | 'generating_prompt' | 'generating_briefing' | 'ready' | 'playing_briefing' | 'playing' | 'error';
 
 export interface AppState {
   alarmTime: string;
@@ -64,21 +62,15 @@ export interface AppState {
   agenda: string;
   calendar: CalendarItem[];
   genrePreset: MusicGenre;
-  playbackSource: PlaybackSource;
   searchedTrack: SearchedSongMetadata | null;
   location: string | null;
   weather: WeatherData | null;
   status: AppStatus;
   errorMessage: string | null;
-  audioSrc: string | null;
   youtubeEmbedUrl: string | null;
-  lyrics: string;
   logs: string[];
   playlist: PlaylistTrack[];
   currentTrackIndex: number;
-  voiceBriefingConfig: VoiceBriefingConfig;
-  playlistConfig: PlaylistConfig;
-  llmConfig: LLMConfig;
   briefingAudioSrc: string | null;
 }
 

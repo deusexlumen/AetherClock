@@ -14,10 +14,10 @@ import {
 } from './services/pwa';
 import { playOfflineFallback, stopOfflineFallback } from './services/offlineAudio';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
-import { generateMusicalPrompt, generateSong } from './services/genai';
+import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
-import { generatePlaylist, buildEmbedUrl, getFallbackVideoId } from './services/playlist';
+import { generatePlaylist, buildEmbedUrl, getNextTrackIndex } from './services/playlist';
 import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
   Power, 
@@ -249,9 +249,9 @@ const getPreAlarmTime = (alarmTimeStr: string): string => {
   let hr = parseInt(hrStr, 10);
   let min = parseInt(minStr, 10);
   
-  min = min - 1;
+  min = min - 2; // Pre-warm 2 minutes before to account for generation + validation time
   if (min < 0) {
-    min = 59;
+    min = 60 + min;
     hr = hr - 1;
     if (hr < 0) {
       hr = 23;
@@ -271,36 +271,15 @@ const App: React.FC = () => {
       agenda: initialAgenda,
       calendar,
       genrePreset: 'auto',
-      playbackSource: 'youtube',
       searchedTrack: null,
       location: null,
       weather: null,
       status: 'idle',
       errorMessage: null,
-      audioSrc: null,
       youtubeEmbedUrl: null,
-      lyrics: '',
       logs: [],
       playlist: [],
       currentTrackIndex: 0,
-      voiceBriefingConfig: {
-        enabled: true,
-        voiceName: 'Fenrir',
-        includeWeather: true,
-        includeAgenda: true,
-        includeTime: true,
-        customGreeting: ''
-      },
-      playlistConfig: {
-        enabled: true,
-        trackCount: 3,
-        shuffle: false,
-        crossfadeSeconds: 0
-      },
-      llmConfig: {
-        textModel: 'gemini-3.5-flash',
-        ttsModel: 'gemini-3.1-flash-tts-preview'
-      },
       briefingAudioSrc: null
     };
   });
@@ -414,59 +393,22 @@ const App: React.FC = () => {
   // TTS Player instance
   const ttsPlayerRef = useRef(new TTSPlayer());
 
-  // Audio Context & Analyser for real visualizer
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-
   // YouTube IFrame Player
   const youtubePlayerRef = useRef<any>(null);
   const youtubeContainerRef = useRef<HTMLDivElement>(null);
-
-  const connectAudioVisualizer = (audioElement: HTMLAudioElement) => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    const ctx = audioContextRef.current;
-    if (ctx.state === 'suspended') {
-      ctx.resume();
-    }
-
-    // Only create source if not already connected to this element
-    if (sourceNodeRef.current?.mediaElement === audioElement) {
-      return; // Already connected
-    }
-
-    // Clean up any previous connection to avoid "already connected" errors on recycled elements
-    if (sourceNodeRef.current) {
-      try { sourceNodeRef.current.disconnect(); } catch {}
-      sourceNodeRef.current = null;
-    }
-    if (analyserRef.current) {
-      try { analyserRef.current.disconnect(); } catch {}
-      analyserRef.current = null;
-    }
-
-    try {
-      sourceNodeRef.current = ctx.createMediaElementSource(audioElement);
-      analyserRef.current = ctx.createAnalyser();
-      analyserRef.current.fftSize = 256;
-      analyserRef.current.smoothingTimeConstant = 0.85;
-      sourceNodeRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(ctx.destination);
-      setAnalyserTick(t => t + 1);
-    } catch (err) {
-      // Already connected or cross-origin issue
-      console.warn('[Audio] Could not connect visualizer:', err);
-    }
-  };
 
   // Refs for stable alarm-check callbacks (initialized with dummies to avoid TDZ)
   const handleGenerateAndPlayRef = useRef<any>(() => {});
   const startPlaybackSequenceRef = useRef<any>(() => {});
   const handleNextTrackRef = useRef<any>(() => {});
   const alarmPendingRef = useRef<boolean>(false);
-  const [, setAnalyserTick] = useState<number>(0);
+  const errorRecoveryIndexRef = useRef<number>(0);
+
+  const getRecoveryVideoId = (index: number): string | null => {
+    const playlistIds = state.playlist.map(t => t.youtubeVideoId).filter(Boolean);
+    if (playlistIds.length === 0) return null;
+    return playlistIds[index % playlistIds.length];
+  };
   // Dual-Planner Tabs
   const [plannerTab, setPlannerTab] = useState<'interactive' | 'textarea'>('interactive');
   
@@ -475,7 +417,7 @@ const App: React.FC = () => {
   const [newTime, setNewTime] = useState("09:00");
   const [newVibe, setNewVibe] = useState("general");
 
-  const audioRef = useRef<HTMLAudioElement>(null);
+
 
   // Stations configuration
   const getStationName = (genre: MusicGenre): string => {
@@ -550,18 +492,20 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Set audio volume on start/change
+  // Set YouTube player volume on change
   useEffect(() => {
-    if (audioRef.current && loudnessMode !== 'sunrise_progressive') {
-      audioRef.current.volume = volume / 100;
+    if (youtubePlayerRef.current && typeof youtubePlayerRef.current.setVolume === 'function' && loudnessMode !== 'sunrise_progressive') {
+      youtubePlayerRef.current.setVolume(volume);
     }
   }, [volume, loudnessMode, state.status]);
 
   // Progressive sunrise-progressive volume ramp-up handler
   useEffect(() => {
     if (state.status === 'playing' && loudnessMode === 'sunrise_progressive') {
-      let currentVol = 10;
-      if (audioRef.current) audioRef.current.volume = 0.1;
+      let currentVol = Math.min(10, volume);
+      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.setVolume === 'function') {
+        youtubePlayerRef.current.setVolume(currentVol);
+      }
       
       const interval = setInterval(() => {
         currentVol += 10;
@@ -569,8 +513,8 @@ const App: React.FC = () => {
           currentVol = volume;
           clearInterval(interval);
         }
-        if (audioRef.current) {
-          audioRef.current.volume = currentVol / 100;
+        if (youtubePlayerRef.current && typeof youtubePlayerRef.current.setVolume === 'function') {
+          youtubePlayerRef.current.setVolume(currentVol);
         }
       }, 3000); // progressive raise every 3 seconds
       return () => clearInterval(interval);
@@ -709,15 +653,12 @@ const App: React.FC = () => {
       ...prev,
       status: 'generating_prompt',
       searchedTrack: null,
-      lyrics: '',
       playlist: [],
       currentTrackIndex: 0,
       briefingAudioSrc: null
     }));
 
     try {
-      const isYouTube = state.playbackSource === 'youtube';
-
       // 1. Generate first track / prompt
       const resultData = await generateMusicalPrompt(
         state.weather,
@@ -732,37 +673,29 @@ const App: React.FC = () => {
 
       let playlist: PlaylistTrack[] = [];
 
-      // 2. Generate Playlist (if enabled and YouTube mode)
-      if (isYouTube && playlistConfig.enabled) {
+      // 2. Generate Playlist (if enabled)
+      if (playlistConfig.enabled) {
         const fetchTrack = () => generateMusicalPrompt(
           state.weather, state.location, state.agenda, new Date(),
           state.alarmTime, state.genrePreset, blacklist, llmConfig
         ).then(r => r.searchedSong);
 
         playlist = await generatePlaylist(fetchTrack, playlistConfig.trackCount);
-        // If playlist generation returned fewer tracks than expected, pad with fallback
-        while (playlist.length < playlistConfig.trackCount) {
-          const fallbackId = getFallbackVideoId(state.genrePreset);
-          playlist.push({
-            title: 'Radio Fallback',
-            artist: 'AetherClock',
-            youtubeVideoId: fallbackId,
-            whyExplanation: 'Fallback track for continuous playback'
-          });
-        }
-      } else if (isYouTube) {
+      } else {
         // Single track mode
-        playlist = [{
-          title: resultData.searchedSong.title,
-          artist: resultData.searchedSong.artist,
-          youtubeVideoId: resultData.searchedSong.youtubeVideoId || getFallbackVideoId(state.genrePreset),
-          whyExplanation: resultData.searchedSong.whyExplanation
-        }];
+        if (resultData.searchedSong.youtubeVideoId) {
+          playlist = [{
+            title: resultData.searchedSong.title,
+            artist: resultData.searchedSong.artist,
+            youtubeVideoId: resultData.searchedSong.youtubeVideoId,
+            whyExplanation: resultData.searchedSong.whyExplanation
+          }];
+        }
       }
 
       // 3. Generate Voice Briefing (if enabled)
       let briefingSrc: string | null = null;
-      if (isYouTube && voiceBriefingConfig.enabled) {
+      if (voiceBriefingConfig.enabled) {
         setState(prev => ({ ...prev, status: 'generating_briefing' }));
         const briefing = await generateVoiceBriefing(
           state.weather,
@@ -774,66 +707,31 @@ const App: React.FC = () => {
         briefingSrc = `data:${briefing.mimeType};base64,${briefing.audioBase64}`;
       }
 
-      const embedUrl = playlist.length > 0
-        ? buildEmbedUrl(playlist[0].youtubeVideoId)
-        : buildEmbedUrl(resultData.searchedSong.youtubeVideoId || getFallbackVideoId(state.genrePreset));
+      const embedUrl = playlist[0]?.youtubeVideoId ? buildEmbedUrl(playlist[0].youtubeVideoId) : null;
 
       if (preGenerateOnly) {
-        if (!isYouTube) {
-          const result = await generateSong(resultData.musicalPrompt);
-          const audioUrl = `data:${result.mimeType};base64,${result.audioBase64}`;
-          setState(prev => ({
-            ...prev,
-            status: 'ready',
-            searchedTrack: resultData.searchedSong,
-            audioSrc: audioUrl,
-            playlist: [],
-            currentTrackIndex: 0,
-            briefingAudioSrc: briefingSrc,
-            lyrics: result.lyrics,
-          }));
-        } else {
-          setState(prev => ({
-            ...prev,
-            status: 'ready',
-            searchedTrack: resultData.searchedSong,
-            youtubeEmbedUrl: embedUrl,
-            playlist,
-            currentTrackIndex: 0,
-            briefingAudioSrc: briefingSrc,
-            lyrics: 'Broadcast Buffer Ready...'
-          }));
-        }
+        setState(prev => ({
+          ...prev,
+          status: 'ready',
+          searchedTrack: resultData.searchedSong,
+          youtubeEmbedUrl: embedUrl,
+          playlist,
+          currentTrackIndex: 0,
+          briefingAudioSrc: briefingSrc,
+        }));
         return;
       }
 
       // Direct play
       setState(prev => ({
         ...prev,
-        status: isYouTube ? 'playing' : 'generating_music',
+        status: 'playing',
         searchedTrack: resultData.searchedSong,
-        youtubeEmbedUrl: isYouTube ? embedUrl : prev.youtubeEmbedUrl,
+        youtubeEmbedUrl: embedUrl,
         playlist,
         currentTrackIndex: 0,
         briefingAudioSrc: briefingSrc,
-        isAlarmActive: isYouTube ? false : prev.isAlarmActive,
-        lyrics: isYouTube ? 'Broadcast starting...' : ''
-      }));
-
-      if (isYouTube) {
-        return;
-      }
-
-      // 4. Lyria generation (fallback path)
-      const result = await generateSong(resultData.musicalPrompt);
-      const audioUrl = `data:${result.mimeType};base64,${result.audioBase64}`;
-
-      setState(prev => ({
-        ...prev,
-        audioSrc: audioUrl,
-        lyrics: result.lyrics,
-        status: 'playing',
-        isAlarmActive: false
+        isAlarmActive: false,
       }));
     } catch (err: any) {
       console.error(err);
@@ -843,10 +741,6 @@ const App: React.FC = () => {
 
   // Start actual playback sequence (briefing -> playlist track 0)
   const startPlaybackSequence = () => {
-    if (state.playbackSource === 'lyria' && state.audioSrc) {
-      setState(prev => ({ ...prev, status: 'playing', isAlarmActive: false }));
-      return;
-    }
     if (state.briefingAudioSrc && voiceBriefingConfig.enabled) {
       setState(prev => ({ ...prev, status: 'playing_briefing' }));
       ttsPlayerRef.current.play(state.briefingAudioSrc, 'audio/wav', () => {
@@ -855,7 +749,7 @@ const App: React.FC = () => {
           ...prev,
           status: 'playing',
           currentTrackIndex: 0,
-          youtubeEmbedUrl: buildEmbedUrl(prev.playlist[0]?.youtubeVideoId || getFallbackVideoId(prev.genrePreset))
+          youtubeEmbedUrl: prev.playlist[0]?.youtubeVideoId ? buildEmbedUrl(prev.playlist[0].youtubeVideoId) : null
         }));
       });
     } else {
@@ -863,13 +757,14 @@ const App: React.FC = () => {
         ...prev,
         status: 'playing',
         currentTrackIndex: 0,
-        youtubeEmbedUrl: buildEmbedUrl(prev.playlist[0]?.youtubeVideoId || getFallbackVideoId(prev.genrePreset))
+        youtubeEmbedUrl: prev.playlist[0]?.youtubeVideoId ? buildEmbedUrl(prev.playlist[0].youtubeVideoId) : null
       }));
     }
   };
 
   // Advance to next track in playlist
   const handleNextTrack = useCallback(() => {
+    errorRecoveryIndexRef.current = 0;
     if (state.playlist.length === 0) return;
     if (state.playlist.length === 1) {
       if (youtubePlayerRef.current?.loadVideoById) {
@@ -888,6 +783,7 @@ const App: React.FC = () => {
   }, [state.playlist.length, state.currentTrackIndex, playlistConfig.shuffle]);
 
   const handlePrevTrack = useCallback(() => {
+    errorRecoveryIndexRef.current = 0;
     if (state.playlist.length <= 1) return;
     const prevIndex = state.currentTrackIndex === 0 ? state.playlist.length - 1 : state.currentTrackIndex - 1;
     setState(prev => ({
@@ -902,43 +798,19 @@ const App: React.FC = () => {
   startPlaybackSequenceRef.current = startPlaybackSequence;
   handleNextTrackRef.current = handleNextTrack;
 
+  // Manage autoplay-blocked state for TTS briefing
   useEffect(() => {
-    if (state.status === 'playing') {
-      if (state.playbackSource === 'youtube') {
-        audioRef.current?.pause();
-        setIsAutoplayBlocked(false);
-      } else if (audioRef.current && state.audioSrc) {
-        audioRef.current.src = state.audioSrc;
-        audioRef.current.play()
-          .then(() => {
-            setIsAutoplayBlocked(false);
-          })
-          .catch((error) => {
-            console.warn("Autoplay block detected:", error);
-            setIsAutoplayBlocked(true);
-          });
-      }
-    } else if (state.status === 'idle' && audioRef.current) {
-      audioRef.current.pause();
+    if (state.status === 'idle') {
       setIsAutoplayBlocked(false);
     }
-  }, [state.status, state.audioSrc, state.playbackSource]);
-
-  // Connect audio element to visualizer when playing non-YouTube audio
-  useEffect(() => {
-    if ((state.status === 'playing' || state.status === 'playing_briefing') && audioRef.current && state.playbackSource !== 'youtube') {
-      connectAudioVisualizer(audioRef.current);
-    }
-  }, [state.status, state.audioSrc, state.playbackSource]);
+  }, [state.status]);
 
   // YouTube IFrame Player: initialize once
   useEffect(() => {
-    if (state.playbackSource !== 'youtube') return;
     if (youtubePlayerRef.current) return; // Already initialized
 
     const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId
-      || state.searchedTrack?.youtubeVideoId
-      || getFallbackVideoId(state.genrePreset);
+      || state.searchedTrack?.youtubeVideoId;
 
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -959,6 +831,22 @@ const App: React.FC = () => {
           enablejsapi: 1,
         },
         events: {
+          onReady: () => {
+            console.log('[YT] Player ready');
+          },
+          onError: (event: any) => {
+            console.warn('[YT] Player error code:', event.data);
+            // Embedding errors: 100=not found, 101/150=embedding disabled
+            errorRecoveryIndexRef.current += 1;
+            const nextId = getRecoveryVideoId(errorRecoveryIndexRef.current);
+            if (!nextId) {
+              console.error('[YT] No playable video IDs available.');
+              setState(prev => ({ ...prev, status: 'error', errorMessage: 'No embeddable video found. Try a different station or tune in again.' }));
+              return;
+            }
+            console.log('[YT] Retrying with recovery ID:', nextId);
+            youtubePlayerRef.current?.loadVideoById?.(nextId);
+          },
           onStateChange: (event: any) => {
             if (event.data === (window as any).YT.PlayerState.ENDED) {
               handleNextTrackRef.current();
@@ -978,36 +866,28 @@ const App: React.FC = () => {
       if (retryTimer) clearTimeout(retryTimer);
       (window as any).onYouTubeIframeAPIReady = null;
     };
-  }, [state.playbackSource]);
+  }, []);
 
   // YouTube IFrame Player: load next video when track changes
   useEffect(() => {
-    if (state.playbackSource !== 'youtube') return;
     if (!youtubePlayerRef.current || !youtubePlayerRef.current.loadVideoById) return;
+    errorRecoveryIndexRef.current = 0; // Reset recovery on intentional track change
 
     const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId
-      || state.searchedTrack?.youtubeVideoId
-      || getFallbackVideoId(state.genrePreset);
+      || state.searchedTrack?.youtubeVideoId;
 
     youtubePlayerRef.current.loadVideoById(videoId);
-  }, [state.currentTrackIndex, state.playbackSource]);
+  }, [state.currentTrackIndex]);
 
-  // YouTube IFrame Player: destroy when leaving youtube mode
+  // YouTube IFrame Player: destroy on unmount
   useEffect(() => {
-    if (state.playbackSource === 'youtube') return;
-    if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
-      youtubePlayerRef.current.destroy();
-      youtubePlayerRef.current = null;
-    }
-  }, [state.playbackSource]);
-
-  // When direct generation finishes and status becomes 'playing', start sequence if briefing exists
-  useEffect(() => {
-    if (state.status === 'playing' && state.playlist.length > 0 && !state.youtubeEmbedUrl) {
-      startPlaybackSequence();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.status, state.playlist.length]);
+    return () => {
+      if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
+        youtubePlayerRef.current.destroy();
+        youtubePlayerRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8 overflow-hidden select-none">
@@ -1624,7 +1504,7 @@ const App: React.FC = () => {
                         <div className="flex flex-col text-left gap-0.5">
                           <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1"><Compass className="w-2.5 h-2.5 animate-spin-slow" /> Tuner State</span>
                           <span className="text-xs font-digital text-radio-lit/50 uppercase tracking-widest led-text-shadow">
-                            {state.status === 'generating_prompt' ? (state.playbackSource === 'youtube' ? 'TUNING STATION...' : 'SEARCHING THEMES...') : getStationName(state.genrePreset)}
+                            {state.status === 'generating_prompt' ? 'TUNING STATION...' : getStationName(state.genrePreset)}
                           </span>
                         </div>
                         <div className="text-right flex flex-col gap-0.5">
@@ -1648,8 +1528,8 @@ const App: React.FC = () => {
                     )}
 
                     {/* Visualizer and Stream Progress */}
-                    <div id="visualizer-slot" className={`relative transition-all duration-500 ease-in-out ${state.playbackSource === 'youtube' && (state.status === 'playing' || state.status === 'playing_briefing') ? 'h-32 sm:h-48' : 'h-24'}`}>
-                        {state.playbackSource === 'youtube' && (state.status === 'playing' || state.status === 'playing_briefing') ? (
+                    <div id="visualizer-slot" className={`relative transition-all duration-500 ease-in-out ${(state.status === 'playing' || state.status === 'playing_briefing') ? 'h-32 sm:h-48' : 'h-24'}`}>
+                        {(state.status === 'playing' || state.status === 'playing_briefing') ? (
                           <div 
                             className="w-full h-full relative rounded overflow-hidden border-2 border-white/10 shadow-inset-screen pointer-events-auto transition-opacity duration-1000"
                             style={{ opacity: state.status === 'playing' ? 1 : 0.3 }}
@@ -1659,7 +1539,7 @@ const App: React.FC = () => {
                             {/* TRANS-BEAM DIRECT FEED BYPASS CONTROLLER */}
                             <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5">
                               <a 
-                                 href={`https://www.youtube.com/watch?v=${state.playlist[state.currentTrackIndex]?.youtubeVideoId || state.searchedTrack?.youtubeVideoId || getFallbackVideoId(state.genrePreset)}`}
+                                 href={`https://www.youtube.com/watch?v=${state.playlist[state.currentTrackIndex]?.youtubeVideoId || state.searchedTrack?.youtubeVideoId || ''}`}
                                  target="_blank"
                                  rel="noreferrer"
                                  className="flex items-center gap-1 px-2.5 py-1 bg-black/95 hover:bg-radio-lit text-radio-lit hover:text-neutral-50 border border-radio-lit/50 hover:border-transparent rounded text-[9px] uppercase tracking-wider font-mono transition-all shadow-[0_0_8px_var(--radio-glow)] cursor-pointer"
@@ -1677,44 +1557,16 @@ const App: React.FC = () => {
                         ) : (
                           <div className="w-full h-full relative">
                             <Visualizer 
-                              analyser={analyserRef.current} 
-                              isActive={(state.status === 'playing' || state.status === 'playing_briefing') && state.playbackSource !== 'youtube'} 
+                              analyser={null} 
+                              isActive={false} 
                               status={state.status} 
                               genre={state.genrePreset}
                             />
-                            
-                            {/* Autoplay Blocker Overlay */}
-                            {isAutoplayBlocked && (state.status === 'playing' || state.status === 'playing_briefing') && state.playbackSource !== 'youtube' && (
-                              <button 
-                                 type="button"
-                                 onClick={() => {
-                                    if (audioRef.current) {
-                                       audioRef.current.play()
-                                          .then(() => setIsAutoplayBlocked(false))
-                                          .catch(console.error);
-                                    }
-                                 }}
-                                 className="absolute inset-0 bg-neutral-950/95 border-2 border-radio-lit rounded flex flex-col items-center justify-center gap-1.5 cursor-pointer z-20"
-                                 aria-label="Tap to unmute stream description"
-                              >
-                                 <Volume2 className="w-5 h-5 text-radio-lit animate-pulse" />
-                                 <b className="text-[10px] sm:text-[11px] font-mono text-radio-lit led-text-shadow uppercase tracking-widest">
-                                    Broadcast Muted (Click to Listen)
-                                 </b>
-                              </button>
-                            )}
                           </div>
                         )}
                     </div>
 
-                    {/* Lyrics Console */}
-                    {state.lyrics && state.status === 'playing' && (
-                      <div className="mt-2 bg-black/40 border border-white/5 p-2 rounded max-h-24 overflow-y-auto scrollbar-thin scrollbar-thumb-red-900 scrollbar-track-transparent">
-                        <p className="text-radio-lit/80 text-[11px] font-mono text-center whitespace-pre-wrap leading-relaxed led-text-shadow border-t border-red-500/20 pt-2 uppercase">
-                          {state.lyrics}
-                        </p>
-                      </div>
-                    )}
+
                 </div>
             </div>
 
@@ -1724,22 +1576,7 @@ const App: React.FC = () => {
                    <span className="text-[9px] font-mono text-radio-dim uppercase tracking-widest pl-1 flex items-center gap-1">
                       <Sliders className="w-3 h-3 text-red-500/60" /> Preset Tuner Station Presets (Freq Select)
                    </span>
-                   <div className="flex items-center gap-2 bg-black/40 px-2 py-0.5 rounded border border-white/5">
-                      <span className="text-[7.5px] font-mono text-gray-500 uppercase">Engine</span>
-                      <button 
-                         onClick={() => setState(prev => ({ ...prev, playbackSource: 'youtube' }))}
-                         className={`text-[8px] font-mono font-bold uppercase transition-colors px-1 ${state.playbackSource === 'youtube' ? 'text-blue-400' : 'text-gray-600 hover:text-gray-400'}`}
-                      >
-                         YOUTUBE
-                      </button>
-                      <span className="text-gray-700 text-[8px]">|</span>
-                      <button 
-                         onClick={() => setState(prev => ({ ...prev, playbackSource: 'lyria' }))}
-                         className={`text-[8px] font-mono font-bold uppercase transition-colors px-1 ${state.playbackSource === 'lyria' ? 'text-radio-lit' : 'text-gray-600 hover:text-gray-400'}`}
-                      >
-                         LYRIA
-                      </button>
-                   </div>
+
                 </div>
                 
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
@@ -1949,7 +1786,6 @@ const App: React.FC = () => {
                    id="deck-btn-play"
                    onClick={() => {
                      if (state.status === 'playing' || state.status === 'playing_briefing') {
-                        audioRef.current?.pause();
                         ttsPlayerRef.current.stop();
                         stopOfflineFallback();
                         setState(prev => ({ ...prev, status: 'idle' }));
@@ -1969,7 +1805,7 @@ const App: React.FC = () => {
                       <Play className="w-5 h-5 text-green-500 mb-1 drop-shadow-[0_0_3px_rgba(34,197,94,0.5)]" />
                    )}
                    <span className="text-[8px] font-bold text-gray-300 uppercase">
-                      {state.status === 'playing' || state.status === 'playing_briefing' ? 'STOP' : state.playbackSource === 'youtube' ? 'TUNE IN' : 'GENERATE'}
+                      {state.status === 'playing' || state.status === 'playing_briefing' ? 'STOP' : 'TUNE IN'}
                    </span>
                 </button>
             </div>
@@ -1978,7 +1814,7 @@ const App: React.FC = () => {
 
       </div>
 
-      <audio ref={audioRef} className="hidden" onEnded={() => setState(prev => ({...prev, status: 'idle'}))} />
+
 
       {/* Weather service attribution */}
       {state.weather && (
