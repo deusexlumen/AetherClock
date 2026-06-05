@@ -1,16 +1,35 @@
+// BUXE_OS v24.X -- PLAYLIST SERVICE
 import { MusicGenre, PlaylistTrack, SearchedSongMetadata } from '../types';
 
-export const buildEmbedUrl = (videoId: string): string => {
+// Garantiert embeddable Fallback-Videos (Lofi-Radio Streams)
+export const REPUTABLE_YOUTUBE_FALLBACKS: Record<MusicGenre, string[]> = {
+  auto: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  synthwave: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  acoustic: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  lofi: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  rock: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  classical: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  jazz: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  pop: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  ambient: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  hiphop: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+};
+
+export const buildEmbedUrl = (videoId: string | null | undefined): string | null => {
   const id = videoId?.trim();
-  if (!id) {
-    return `https://www.youtube.com/embed/?autoplay=1&controls=0&modestbranding=1&enablejsapi=1`;
-  }
+  if (!id) return null;
   return `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&modestbranding=1&playlist=${id}&loop=1&enablejsapi=1`;
+};
+
+export const getFallbackVideoId = (genre: MusicGenre): string => {
+  const list = REPUTABLE_YOUTUBE_FALLBACKS[genre] || REPUTABLE_YOUTUBE_FALLBACKS.auto;
+  return list[Math.floor(Math.random() * list.length)];
 };
 
 export const generatePlaylist = async (
   fetchTrackFn: () => Promise<SearchedSongMetadata>,
-  trackCount: number
+  trackCount: number,
+  genre: MusicGenre = 'auto'
 ): Promise<PlaylistTrack[]> => {
   const tracks: PlaylistTrack[] = [];
   const usedIds = new Set<string>();
@@ -40,6 +59,23 @@ export const generatePlaylist = async (
       youtubeVideoId: videoId,
       whyExplanation: meta.whyExplanation,
     });
+  }
+
+  // Mit Fallbacks auffuellen, damit der Alarm nie stumm bleibt
+  while (tracks.length < safeTrackCount) {
+    const fallbackId = getFallbackVideoId(genre);
+    if (!usedIds.has(fallbackId)) {
+      usedIds.add(fallbackId);
+      tracks.push({
+        title: 'Fallback Broadcast',
+        artist: 'AetherClock Radio',
+        youtubeVideoId: fallbackId,
+        whyExplanation: 'Emergency fallback signal tuned to your station preset.',
+      });
+    } else {
+      // Wenn alle Fallbacks schon verbraucht sind, abbrechen um Endlosschleife zu vermeiden
+      break;
+    }
   }
 
   return tracks;

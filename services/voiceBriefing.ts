@@ -50,26 +50,31 @@ export const generateVoiceBriefing = async (
 
   const text = parts.join(' ');
 
-  const response = await ai.models.generateContent({
-    model: llmConfig?.ttsModel || DEFAULT_TTS_MODEL,
-    contents: [{ parts: [{ text }] }],
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: config.voiceName },
+  try {
+    const response = await ai.models.generateContent({
+      model: llmConfig?.ttsModel || DEFAULT_TTS_MODEL,
+      contents: [{ parts: [{ text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: config.voiceName },
+          },
         },
       },
-    },
-  });
+    });
 
-  const part = response.candidates?.[0]?.content?.parts?.[0];
-  const audioBase64 = part?.inlineData?.data || '';
-  const mimeType = part?.inlineData?.mimeType || 'audio/wav';
+    const part = response.candidates?.[0]?.content?.parts?.[0];
+    const audioBase64 = part?.inlineData?.data || '';
+    const mimeType = part?.inlineData?.mimeType || 'audio/wav';
 
-  if (!audioBase64) {
-    throw new Error('TTS generation returned no audio');
+    if (!audioBase64) {
+      throw new Error('TTS generation returned no audio');
+    }
+
+    return { audioBase64, mimeType, text };
+  } catch (error) {
+    console.error('[VoiceBriefing] Generation failed:', error);
+    return { audioBase64: '', mimeType: 'audio/wav', text: '' };
   }
-
-  return { audioBase64, mimeType, text };
 };

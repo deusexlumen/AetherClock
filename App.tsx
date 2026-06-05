@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock } from './components/Clock';
 import { Visualizer } from './components/Visualizer';
 import { PlaylistViewer } from './components/PlaylistViewer';
-import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig } from './types';
+import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack } from './types';
 import { fetchWeather } from './services/weather';
 import { 
   registerServiceWorker, 
@@ -521,6 +521,30 @@ const App: React.FC = () => {
     }
   }, [state.status, loudnessMode, volume]);
 
+  // Max Impact Shock Alarm: Sofort 100% Lautstaerke
+  useEffect(() => {
+    if (state.status === 'playing' && loudnessMode === 'max_impact') {
+      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.setVolume === 'function') {
+        youtubePlayerRef.current.setVolume(100);
+      }
+    }
+  }, [state.status, loudnessMode]);
+
+  // Autoplay-Block Erkennung fuer mobile Browser
+  useEffect(() => {
+    if (state.status !== 'playing') return;
+    const timer = setTimeout(() => {
+      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getPlayerState === 'function') {
+        const playerState = youtubePlayerRef.current.getPlayerState();
+        const YT = (window as any).YT;
+        if (YT && playerState !== YT.PlayerState.PLAYING && playerState !== YT.PlayerState.BUFFERING) {
+          setIsAutoplayBlocked(true);
+        }
+      }
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [state.status, state.currentTrackIndex]);
+
   // Apply dark/light body properties on theme changes
   useEffect(() => {
     const cols = THEMES[currentTheme];
@@ -592,7 +616,7 @@ const App: React.FC = () => {
 
   // Auto-trigger alarm when generation finishes and alarm time was reached
   useEffect(() => {
-    if (state.status === 'ready' && alarmPendingRef.current) {
+    if (state.status === 'ready' && alarmPendingRef.current && state.isAlarmActive) {
       alarmPendingRef.current = false;
       setState(prev => ({ ...prev, isAlarmActive: false }));
       if (notificationsEnabled) {
@@ -600,7 +624,7 @@ const App: React.FC = () => {
       }
       startPlaybackSequenceRef.current();
     }
-  }, [state.status, notificationsEnabled]);
+  }, [state.status, state.isAlarmActive, notificationsEnabled]);
 
   // Sync inputs
   const syncCalendarToAgenda = (newCalendar: CalendarItem[]) => {
@@ -680,7 +704,7 @@ const App: React.FC = () => {
           state.alarmTime, state.genrePreset, blacklist, llmConfig
         ).then(r => r.searchedSong);
 
-        playlist = await generatePlaylist(fetchTrack, playlistConfig.trackCount);
+        playlist = await generatePlaylist(fetchTrack, playlistConfig.trackCount, state.genrePreset);
       } else {
         // Single track mode
         if (resultData.searchedSong.youtubeVideoId) {
@@ -704,7 +728,9 @@ const App: React.FC = () => {
           voiceBriefingConfig,
           llmConfig
         );
-        briefingSrc = `data:${briefing.mimeType};base64,${briefing.audioBase64}`;
+        if (briefing.audioBase64) {
+          briefingSrc = `data:${briefing.mimeType};base64,${briefing.audioBase64}`;
+        }
       }
 
       const embedUrl = playlist[0]?.youtubeVideoId ? buildEmbedUrl(playlist[0].youtubeVideoId) : null;
@@ -1331,19 +1357,7 @@ const App: React.FC = () => {
                                          className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
                                      />
                                  </div>
-                                 <div className="flex flex-col gap-0.5">
-                                     <label className="text-[8px] font-mono text-gray-500 uppercase">Crossfade ({playlistConfig.crossfadeSeconds}s)</label>
-                                     <input
-                                         type="range" min="0" max="5"
-                                         value={playlistConfig.crossfadeSeconds}
-                                         onChange={(e) => {
-                                             const next = { ...playlistConfig, crossfadeSeconds: parseInt(e.target.value) };
-                                             setPlaylistConfig(next);
-                                             localStorage.setItem('lyria_playlist', JSON.stringify(next));
-                                         }}
-                                         className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
-                                     />
-                                 </div>
+
                                  <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
                                      <input type="checkbox" checked={playlistConfig.shuffle} onChange={(e) => { const next = { ...playlistConfig, shuffle: e.target.checked }; setPlaylistConfig(next); localStorage.setItem('lyria_playlist', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Shuffle
                                  </label>
@@ -1590,8 +1604,10 @@ const App: React.FC = () => {
                                 setState(prev => ({ 
                                   ...prev, 
                                   genrePreset: station,
-                                  isAlarmActive: true, // Auto-arm on tune for premium UX
-                                  searchedTrack: null // Clear previous searched song
+                                  isAlarmActive: true,
+                                  searchedTrack: null,
+                                  playlist: [],
+                                  currentTrackIndex: 0
                                 }));
                              }}
                              className={`btn-spring p-2 rounded font-mono text-[9px] font-bold uppercase border tracking-wider relative overflow-hidden flex flex-col items-center gap-1
@@ -1847,6 +1863,26 @@ const App: React.FC = () => {
           </div>
           <span className="text-gray-600 font-mono text-[10px] uppercase tracking-widest animate-pulse">
             Tap to wake
+          </span>
+        </div>
+      )}
+
+      {/* Autoplay Unlock Overlay */}
+      {isAutoplayBlocked && (
+        <div 
+          className="fixed inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center gap-4 cursor-pointer"
+          onClick={() => {
+            if (youtubePlayerRef.current?.playVideo) {
+              youtubePlayerRef.current.playVideo();
+            }
+            setIsAutoplayBlocked(false);
+          }}
+        >
+          <span className="text-radio-lit font-mono text-sm uppercase tracking-widest animate-pulse">
+            Broadcast Muted (Click to Listen)
+          </span>
+          <span className="text-gray-500 font-mono text-[10px] uppercase tracking-widest">
+            Tap anywhere to unlock audio
           </span>
         </div>
       )}
