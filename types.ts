@@ -127,3 +127,30 @@ export const WEATHER_CODES: Record<number, string> = {
   96: "Thunderstorm with slight hail",
   99: "Thunderstorm with heavy hail",
 };
+
+export interface PushSubscriptionKeys {
+  p256dh: string;
+  auth: string;
+}
+
+export interface PushSubscriptionJSON {
+  endpoint: string;
+  expirationTime: number | null;
+  keys: PushSubscriptionKeys;
+}
+
+export interface ServerAlarm {
+  id: string;
+  time: string; // HH:MM
+  label: string;
+  isActive: boolean;
+  days: WeekDay[];
+}
+
+export interface DeviceRecord {
+  deviceId: string;
+  subscription: PushSubscriptionJSON | null;
+  alarms: ServerAlarm[];
+  timezone: string;
+  updatedAt: string;
+}
