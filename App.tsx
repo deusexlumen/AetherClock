@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Clock } from './components/Clock';
 import { Visualizer } from './components/Visualizer';
 import { PlaylistViewer } from './components/PlaylistViewer';
@@ -14,10 +14,12 @@ import {
 } from './services/pwa';
 import { playOfflineFallback, stopOfflineFallback } from './services/offlineAudio';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { AlarmList } from './components/AlarmList';
 import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
 import { generatePlaylist, getNextTrackIndex, buildEmbedUrl, buildNcsChannelEmbedUrl } from './services/playlist';
+import { loadAlarms, saveAlarms, getNextAlarm, getAlarmStatusText, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
 import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
   Power, 
@@ -126,6 +128,8 @@ export const formatCalendarToAgenda = (calendar: CalendarItem[]): string => {
     'lyria_notifications',
     'lyria_offline_fallback',
     'lyria_screensaver_timeout',
+    'lyria_alarm_time',
+    'lyria_alarm_active',
   ];
   for (const oldKey of legacyKeys) {
     try {
@@ -276,21 +280,7 @@ const THEMES = {
   }
 };
 
-const getPreAlarmTime = (alarmTimeStr: string): string => {
-  const [hrStr, minStr] = alarmTimeStr.split(':');
-  let hr = parseInt(hrStr, 10);
-  let min = parseInt(minStr, 10);
-  
-  min = min - 1; // Pre-warm 1 minute before to account for generation + validation time
-  if (min < 0) {
-    min = 60 + min;
-    hr = hr - 1;
-    if (hr < 0) {
-      hr = 23;
-    }
-  }
-  return `${hr.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-};
+
 
 const App: React.FC = () => {
   const initialAgenda = `0800 Drop Ava at nursery\n1000 Team meeting\n1200 lunch with Amanda\n1400 call with Jerry`;
@@ -298,8 +288,9 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const calendar = parseAgendaToCalendar(initialAgenda);
     return {
-      alarmTime: "07:00",
-      isAlarmActive: false,
+      alarms: loadAlarms(),
+      currentAlarmId: null,
+      generatedForAlarmId: null,
       agenda: initialAgenda,
       calendar,
       genrePreset: 'auto',
@@ -395,6 +386,11 @@ const App: React.FC = () => {
   const screenSaverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetScreenSaverTimerRef = useRef<() => void>(() => {});
 
+  const isAnyAlarmActive = useMemo(() => state.alarms.some((a) => a.isActive), [state.alarms]);
+  const currentAlarm = useMemo(
+    () => state.alarms.find((a) => a.id === state.currentAlarmId) ?? null,
+    [state.alarms, state.currentAlarmId]
+  );
   // Screen saver logic
   const resetScreenSaverTimer = () => {
     if (screenSaverTimerRef.current) {
@@ -422,6 +418,11 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Persist alarms whenever they change
+  useEffect(() => {
+    saveAlarms(state.alarms);
+  }, [state.alarms]);
+
   // TTS Player instance
   const ttsPlayerRef = useRef(new TTSPlayer());
 
@@ -433,8 +434,11 @@ const App: React.FC = () => {
   const handleGenerateAndPlayRef = useRef<any>(() => {});
   const startPlaybackSequenceRef = useRef<any>(() => {});
   const handleNextTrackRef = useRef<any>(() => {});
-  const alarmPendingRef = useRef<boolean>(false);
+  const generationEpochRef = useRef<number>(0);
   const errorRecoveryIndexRef = useRef<number>(0);
+  const lastMinuteRef = useRef<string>('');
+  const triggeredRef = useRef<Set<string>>(new Set());
+  const prewarmedRef = useRef<Set<string>>(new Set());
 
   const getRecoveryVideoId = (index: number): string | null => {
     const playlistIds = state.playlist.map(t => t.youtubeVideoId).filter(Boolean) as string[];
@@ -601,65 +605,87 @@ const App: React.FC = () => {
   // Alarm Check trigger loop
   useEffect(() => {
     const checkAlarm = () => {
-      if (!state.isAlarmActive) return;
-      
       const now = new Date();
       const hours = now.getHours().toString().padStart(2, '0');
       const minutes = now.getMinutes().toString().padStart(2, '0');
       const currentTime = `${hours}:${minutes}`;
-      const preAlarmTime = getPreAlarmTime(state.alarmTime);
+      const currentDayKey = getCurrentWeekDay(now);
 
-      // 1. Pre-warm option (60 seconds before)
-      if (isPreWarmEnabled && currentTime === preAlarmTime && state.status === 'idle') {
-         handleGenerateAndPlayRef.current(true);
+      // Minute rollover: clear per-minute dedup sets so alarms can fire again in future minutes.
+      if (lastMinuteRef.current !== currentTime) {
+        lastMinuteRef.current = currentTime;
+        triggeredRef.current.clear();
+        prewarmedRef.current.clear();
       }
 
-      // 2. Main alarm match trigger
-      if (currentTime === state.alarmTime) {
-         alarmPendingRef.current = false;
-         if (!isOnlineStatus && offlineFallbackEnabled) {
-            setState(prev => ({ ...prev, status: 'playing', isAlarmActive: false }));
+      for (const alarm of state.alarms) {
+        if (!alarm.isActive) continue;
+        if (alarm.days.length > 0 && !alarm.days.includes(currentDayKey)) continue;
+
+        const prewarmKey = `${alarm.id}:${currentTime}`;
+        const triggerKey = `${alarm.id}:${currentTime}`;
+        const preAlarmTime = getPreAlarmTime(alarm.time);
+
+        if (
+          isPreWarmEnabled &&
+          currentTime === preAlarmTime &&
+          state.status === 'idle' &&
+          !prewarmedRef.current.has(prewarmKey)
+        ) {
+          prewarmedRef.current.add(prewarmKey);
+          handleGenerateAndPlayRef.current(alarm.id, true);
+        }
+
+        if (currentTime === alarm.time && !triggeredRef.current.has(triggerKey)) {
+          triggeredRef.current.add(triggerKey);
+          setState((prev) => ({ ...prev, currentAlarmId: alarm.id }));
+
+          if (!isOnlineStatus && offlineFallbackEnabled) {
+            setState((prev) => ({ ...prev, status: 'playing' }));
             playOfflineFallback();
             if (notificationsEnabled) {
-              sendAlarmNotification('AetherClock Alarm', 'Wake up! Playing offline fallback alarm.');
+              sendAlarmNotification('AetherClock Alarm', `Wake up! ${alarm.label}`);
             }
             return;
-         }
+          }
 
-         if (state.status === 'ready') {
-            setState(prev => ({ ...prev, isAlarmActive: false }));
-            if (notificationsEnabled) {
-              sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
+          if (state.status === 'ready') {
+            if (state.generatedForAlarmId === alarm.id) {
+              if (notificationsEnabled) {
+                sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
+              }
+              startPlaybackSequenceRef.current(state.briefingAudioSrc, state.playlist, alarm.voiceBriefingConfig);
+            } else {
+              if (notificationsEnabled) {
+                sendAlarmNotification('AetherClock', 'Generating your broadcast now...');
+              }
+              handleGenerateAndPlayRef.current(alarm.id, false);
             }
-            startPlaybackSequenceRef.current();
-         } else if (state.status === 'idle') {
-            setState(prev => ({ ...prev, isAlarmActive: false }));
+          } else if (state.status === 'idle') {
             if (notificationsEnabled) {
               sendAlarmNotification('AetherClock', 'Generating your broadcast now...');
             }
-            handleGenerateAndPlayRef.current(false);
-         } else {
-            // Generation still in progress — auto-trigger when ready
-            alarmPendingRef.current = true;
-         }
+            handleGenerateAndPlayRef.current(alarm.id, false);
+          } else {
+            // Interrupt any active playback for the new alarm.
+            ttsPlayerRef.current.stop();
+            stopOfflineFallback();
+            if (youtubePlayerRef.current && typeof youtubePlayerRef.current.stopVideo === 'function') {
+              youtubePlayerRef.current.stopVideo();
+            }
+            setState((prev) => ({ ...prev, status: 'idle' }));
+            handleGenerateAndPlayRef.current(alarm.id, false);
+          }
+          // Only the first matching alarm per minute is triggered.
+          return;
+        }
       }
     };
+
     const interval = setInterval(checkAlarm, 1000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.isAlarmActive, state.status, state.alarmTime, isPreWarmEnabled, isOnlineStatus, offlineFallbackEnabled, notificationsEnabled]);
-
-  // Auto-trigger alarm when generation finishes and alarm time was reached
-  useEffect(() => {
-    if (state.status === 'ready' && alarmPendingRef.current && state.isAlarmActive) {
-      alarmPendingRef.current = false;
-      setState(prev => ({ ...prev, isAlarmActive: false }));
-      if (notificationsEnabled) {
-        sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
-      }
-      startPlaybackSequenceRef.current();
-    }
-  }, [state.status, state.isAlarmActive, notificationsEnabled]);
+  }, [state.alarms, state.status, isPreWarmEnabled, isOnlineStatus, offlineFallbackEnabled, notificationsEnabled]);
 
   // Sync inputs
   const syncCalendarToAgenda = (newCalendar: CalendarItem[]) => {
@@ -707,120 +733,147 @@ const App: React.FC = () => {
   };
 
   // Generate Playlist and/or Briefing
-  const handleGenerateAndPlay = async (preGenerateOnly: boolean = false) => {
-    setState(prev => ({
+  const handleGenerateAndPlay = async (alarmId?: string, preGenerateOnly: boolean = false) => {
+    generationEpochRef.current += 1;
+    const epoch = generationEpochRef.current;
+
+    const alarm = alarmId ? state.alarms.find((a) => a.id === alarmId) : undefined;
+    if (alarmId && !alarm) {
+      setState((prev) => ({ ...prev, status: 'idle', currentAlarmId: null }));
+      return;
+    }
+
+    const config = alarm
+      ? {
+          genrePreset: alarm.genrePreset,
+          alarmTime: alarm.time,
+          playlistConfig: alarm.playlistConfig,
+          voiceBriefingConfig: alarm.voiceBriefingConfig,
+        }
+      : {
+          genrePreset: state.genrePreset,
+          alarmTime: getNextAlarm(state.alarms)?.time ?? '07:00',
+          playlistConfig,
+          voiceBriefingConfig,
+        };
+
+    setState((prev) => ({
       ...prev,
       status: 'generating_prompt',
       searchedTrack: null,
       playlist: [],
       currentTrackIndex: 0,
-      briefingAudioSrc: null
+      briefingAudioSrc: null,
+      currentAlarmId: alarm?.id ?? null,
+      generatedForAlarmId: null,
     }));
 
     try {
-      // 1. Generate first track / prompt
       const resultData = await generateMusicalPrompt(
         state.weather,
         state.location,
         state.agenda,
         new Date(),
-        state.alarmTime,
-        state.genrePreset,
+        config.alarmTime,
+        config.genrePreset,
         blacklist,
         llmConfig
       );
+      if (epoch !== generationEpochRef.current) return;
 
       let playlist: PlaylistTrack[] = [];
 
-      // 2. Generate Playlist (if enabled)
-      if (playlistConfig.enabled) {
-        const fetchTrack = () => generateMusicalPrompt(
-          state.weather, state.location, state.agenda, new Date(),
-          state.alarmTime, state.genrePreset, blacklist, llmConfig
-        ).then(r => r.searchedSong);
+      if (config.playlistConfig.enabled) {
+        const fetchTrack = () =>
+          generateMusicalPrompt(
+            state.weather,
+            state.location,
+            state.agenda,
+            new Date(),
+            config.alarmTime,
+            config.genrePreset,
+            blacklist,
+            llmConfig
+          ).then((r) => r.searchedSong);
 
-        playlist = await generatePlaylist(fetchTrack, playlistConfig.trackCount, state.genrePreset);
+        playlist = await generatePlaylist(fetchTrack, config.playlistConfig.trackCount, config.genrePreset);
+        if (epoch !== generationEpochRef.current) return;
       } else {
-        // Single track mode
         if (resultData.searchedSong.youtubeVideoId) {
           const videoId = resultData.searchedSong.youtubeVideoId;
-          playlist = [{
-            title: resultData.searchedSong.title,
-            artist: resultData.searchedSong.artist,
-            youtubeVideoId: videoId,
-            embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
-            whyExplanation: resultData.searchedSong.whyExplanation
-          }];
+          playlist = [
+            {
+              title: resultData.searchedSong.title,
+              artist: resultData.searchedSong.artist,
+              youtubeVideoId: videoId,
+              embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
+              whyExplanation: resultData.searchedSong.whyExplanation,
+            },
+          ];
         }
       }
 
-      // 3. Generate Voice Briefing (if enabled)
       let briefingSrc: string | null = null;
-      if (voiceBriefingConfig.enabled) {
-        setState(prev => ({ ...prev, status: 'generating_briefing' }));
+      if (config.voiceBriefingConfig.enabled) {
+        setState((prev) => ({ ...prev, status: 'generating_briefing' }));
         const briefing = await generateVoiceBriefing(
           state.weather,
           state.calendar,
-          state.alarmTime,
-          voiceBriefingConfig,
+          config.alarmTime,
+          config.voiceBriefingConfig,
           llmConfig
         );
         if (briefing.audioBase64) {
           briefingSrc = `data:${briefing.mimeType};base64,${briefing.audioBase64}`;
         }
+        if (epoch !== generationEpochRef.current) return;
       }
 
       const embedUrl = playlist[0]?.embedUrl || null;
 
-      if (preGenerateOnly) {
-        setState(prev => ({
-          ...prev,
-          status: 'ready',
-          searchedTrack: resultData.searchedSong,
-          youtubeEmbedUrl: embedUrl,
-          playlist,
-          currentTrackIndex: 0,
-          briefingAudioSrc: briefingSrc,
-        }));
-        return;
-      }
-
-      // Direct play
-      setState(prev => ({
+      if (epoch !== generationEpochRef.current) return;
+      setState((prev) => ({
         ...prev,
-        status: 'playing',
+        status: 'ready',
         searchedTrack: resultData.searchedSong,
         youtubeEmbedUrl: embedUrl,
         playlist,
         currentTrackIndex: 0,
         briefingAudioSrc: briefingSrc,
-        isAlarmActive: false,
+        generatedForAlarmId: alarm?.id ?? null,
       }));
+      if (preGenerateOnly) {
+        return;
+      }
+      startPlaybackSequenceRef.current(briefingSrc, playlist, config.voiceBriefingConfig);
     } catch (err: any) {
       console.error(err);
-      setState(prev => ({ ...prev, status: 'error', errorMessage: err?.message || 'Generation failed' }));
+      setState((prev) => ({ ...prev, status: 'error', errorMessage: err?.message || 'Generation failed' }));
     }
   };
 
   // Start actual playback sequence (briefing -> playlist track 0)
-  const startPlaybackSequence = () => {
-    if (state.briefingAudioSrc && voiceBriefingConfig.enabled) {
-      setState(prev => ({ ...prev, status: 'playing_briefing' }));
-      ttsPlayerRef.current.play(state.briefingAudioSrc, 'audio/wav', () => {
-        // TTS ended -> start first track
-        setState(prev => ({
+  const startPlaybackSequence = (
+    initialBriefingSrc: string | null,
+    initialPlaylist: PlaylistTrack[],
+    briefingConfig: VoiceBriefingConfig
+  ) => {
+    if (initialBriefingSrc && briefingConfig.enabled) {
+      setState((prev) => ({ ...prev, status: 'playing_briefing' }));
+      ttsPlayerRef.current.play(initialBriefingSrc, 'audio/wav', () => {
+        setState((prev) => ({
           ...prev,
           status: 'playing',
           currentTrackIndex: 0,
-          youtubeEmbedUrl: prev.playlist[0]?.embedUrl || null
+          youtubeEmbedUrl: initialPlaylist[0]?.embedUrl || null,
         }));
       });
     } else {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         status: 'playing',
         currentTrackIndex: 0,
-        youtubeEmbedUrl: prev.playlist[0]?.embedUrl || null
+        youtubeEmbedUrl: initialPlaylist[0]?.embedUrl || null,
       }));
     }
   };
@@ -836,15 +889,16 @@ const App: React.FC = () => {
       }
       return;
     }
-    const nextIndex = playlistConfig.shuffle
+    const shuffle = currentAlarm ? currentAlarm.playlistConfig.shuffle : playlistConfig.shuffle;
+    const nextIndex = shuffle
       ? getNextTrackIndex(state.currentTrackIndex, state.playlist.length, true)
       : (state.currentTrackIndex + 1) % state.playlist.length;
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       currentTrackIndex: nextIndex,
-      youtubeEmbedUrl: prev.playlist[nextIndex].embedUrl || null
+      youtubeEmbedUrl: prev.playlist[nextIndex].embedUrl || null,
     }));
-  }, [state.playlist.length, state.currentTrackIndex, playlistConfig.shuffle]);
+  }, [state.playlist.length, state.currentTrackIndex, currentAlarm, playlistConfig.shuffle]);
 
   const handlePrevTrack = useCallback(() => {
     errorRecoveryIndexRef.current = 0;
@@ -1236,6 +1290,20 @@ const App: React.FC = () => {
                          </div>
                      </div>
 
+                     {/* Alarms */}
+                     <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
+                         <div className="flex items-center gap-2">
+                             <Bell className="w-3 h-3 text-radio-lit" />
+                             <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">Alarms</span>
+                         </div>
+                         <AlarmList
+                             alarms={state.alarms}
+                             onChange={(nextAlarms) => setState((prev) => ({ ...prev, alarms: nextAlarms }))}
+                             defaultPlaylistConfig={playlistConfig}
+                             defaultVoiceBriefingConfig={voiceBriefingConfig}
+                         />
+                     </div>
+
                      {/* 2. Output Volume Level */}
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                          <div className="flex flex-col gap-1">
@@ -1535,7 +1603,7 @@ const App: React.FC = () => {
                 )}
 
                 <div className="flex-grow flex flex-col justify-center gap-4">
-                    <Clock className="mb-2" isAlarmActive={state.isAlarmActive} />
+                    <Clock className="mb-2" isAlarmActive={isAnyAlarmActive} />
                     
                     {/* TUNED SEARCH TRACK RETRO DISPLAY: Displays discovered song context */}
                     {state.searchedTrack ? (
@@ -1653,7 +1721,6 @@ const App: React.FC = () => {
                                 setState(prev => ({ 
                                   ...prev, 
                                   genrePreset: station,
-                                  isAlarmActive: true,
                                   searchedTrack: null,
                                   playlist: [],
                                   currentTrackIndex: 0
@@ -1821,30 +1888,16 @@ const App: React.FC = () => {
 
             {/* Bottom: Control Deck */}
             <div id="btn-con-deck" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-auto">
-                
-                {/* Alarm Time Set Dial Input */}
-                <div id="deck-dial-time" className="col-span-2 bg-radio-btn rounded shadow-btn active:shadow-btn-pressed transition-all relative overflow-hidden group border-t border-white/5 focus-within:ring-2 focus-within:ring-radio-lit focus-within:ring-inset">
-                     <label htmlFor="wake-time-input" className="absolute top-2 left-3 text-[8px] font-bold text-gray-500 uppercase tracking-wider">Wake-Up Dial</label>
-                     <input 
-                        id="wake-time-input"
-                        type="time" 
-                        className="w-full h-full bg-transparent text-center font-digital text-gray-200 text-2xl pt-5 cursor-pointer outline-none focus:text-radio-lit transition-colors"
-                        value={state.alarmTime}
-                        onChange={(e) => setState(prev => ({ ...prev, alarmTime: e.target.value, isAlarmActive: true }))}
-                     />
-                </div>
-
-                {/* Alarm Toggle Active Push Lock */}
-                <button 
-                    id="deck-btn-toggle"
-                    onClick={() => setState(prev => ({ ...prev, isAlarmActive: !prev.isAlarmActive }))}
-                    className={`btn-spring col-span-1 rounded shadow-btn active:shadow-btn-pressed flex flex-col items-center justify-center p-2 border-t border-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit focus-visible:ring-inset bg-radio-btn hover:bg-neutral-800`}
-                    aria-pressed={state.isAlarmActive}
-                    aria-label="Toggle Alarm Activation"
+                {/* Next Alarm Summary */}
+                <div
+                    id="deck-next-alarm"
+                    className="col-span-1 sm:col-span-3 bg-radio-btn rounded shadow-btn active:shadow-btn-pressed transition-all relative overflow-hidden group border-t border-white/5 p-3 flex flex-col justify-center"
                 >
-                    <div className={`w-2 h-2 rounded-full mb-1 ${state.isAlarmActive ? 'bg-radio-lit led-warm-up' : 'bg-black border border-gray-750 opacity-50'}`} style={{ color: 'var(--radio-lit)' }}></div>
-                    <span className={`text-[10px] font-bold uppercase transition-colors ${state.isAlarmActive ? 'text-gray-200' : 'text-gray-500'}`}>Active</span>
-                </button>
+                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Next Broadcast</span>
+                    <span className="text-sm sm:text-base font-mono text-radio-lit uppercase tracking-wider truncate led-text-shadow">
+                        {getAlarmStatusText(state.alarms)}
+                    </span>
+                </div>
 
                 {/* Big Action Render Button */}
                 <button
@@ -1853,7 +1906,10 @@ const App: React.FC = () => {
                      if (state.status === 'playing' || state.status === 'playing_briefing') {
                         ttsPlayerRef.current.stop();
                         stopOfflineFallback();
-                        setState(prev => ({ ...prev, status: 'idle' }));
+                        if (youtubePlayerRef.current && typeof youtubePlayerRef.current.stopVideo === 'function') {
+                          youtubePlayerRef.current.stopVideo();
+                        }
+                        setState(prev => ({ ...prev, status: 'idle', currentAlarmId: null }));
                      } else if (state.status === 'idle') {
                         handleGenerateAndPlay();
                      }
@@ -1902,8 +1958,8 @@ const App: React.FC = () => {
           onClick={() => setIsScreenSaverActive(false)}
         >
           <div className="text-center">
-            <Clock isAlarmActive={state.isAlarmActive} />
-            {state.isAlarmActive && (
+            <Clock isAlarmActive={isAnyAlarmActive} />
+            {isAnyAlarmActive && (
               <div className="mt-4 flex items-center justify-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-radio-lit animate-pulse shadow-[0_0_8px_rgba(255,51,51,0.8)]" />
                 <span className="text-radio-lit font-mono text-xs uppercase tracking-widest">Alarm Armed</span>

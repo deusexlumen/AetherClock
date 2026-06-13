@@ -12,7 +12,24 @@ export interface CalendarItem {
   active: boolean;
 }
 
+export type WeekDay = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export const WEEKDAYS: readonly WeekDay[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+export interface Alarm {
+  id: string;
+  time: string; // "HH:MM"
+  label: string;
+  isActive: boolean;
+  days: WeekDay[];
+  genrePreset: MusicGenre;
+  playlistConfig: PlaylistConfig;
+  voiceBriefingConfig: VoiceBriefingConfig;
+}
+
 export type MusicGenre = 'auto' | 'synthwave' | 'acoustic' | 'lofi' | 'rock' | 'classical' | 'jazz' | 'pop' | 'ambient' | 'hiphop';
+
+export const MUSIC_GENRES: readonly MusicGenre[] = ['auto', 'synthwave', 'acoustic', 'lofi', 'rock', 'classical', 'jazz', 'pop', 'ambient', 'hiphop'];
 
 export interface SearchedSongMetadata {
   title: string;
@@ -43,6 +60,8 @@ export interface VoiceBriefingConfig {
   customGreeting: string;
 }
 
+export const VOICE_NAMES: readonly VoiceBriefingConfig['voiceName'][] = ['Fenrir', 'Kore', 'Leda'];
+
 export interface LLMConfig {
   textModel: TextModel;
   ttsModel: TTSModel;
@@ -58,8 +77,11 @@ export interface PlaylistConfig {
 export type AppStatus = 'idle' | 'generating_prompt' | 'generating_briefing' | 'ready' | 'playing_briefing' | 'playing' | 'error';
 
 export interface AppState {
-  alarmTime: string;
-  isAlarmActive: boolean;
+  alarms: Alarm[];
+  // Alarm currently firing; null when no alarm triggered.
+  currentAlarmId: string | null;
+  // Alarm whose generated playlist/briefing is currently cached; null if cache is empty/unowned.
+  generatedForAlarmId: string | null;
   agenda: string;
   calendar: CalendarItem[];
   genrePreset: MusicGenre;
