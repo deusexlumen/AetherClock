@@ -418,6 +418,11 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // Persist alarms whenever they change
+  useEffect(() => {
+    saveAlarms(state.alarms);
+  }, [state.alarms]);
+
   // TTS Player instance
   const ttsPlayerRef = useRef(new TTSPlayer());
 
@@ -1293,10 +1298,7 @@ const App: React.FC = () => {
                          </div>
                          <AlarmList
                              alarms={state.alarms}
-                             onChange={(nextAlarms) => {
-                               saveAlarms(nextAlarms);
-                               setState((prev) => ({ ...prev, alarms: nextAlarms }));
-                             }}
+                             onChange={(nextAlarms) => setState((prev) => ({ ...prev, alarms: nextAlarms }))}
                              defaultPlaylistConfig={playlistConfig}
                              defaultVoiceBriefingConfig={voiceBriefingConfig}
                          />
