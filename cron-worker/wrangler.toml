@@ -4,7 +4,7 @@ compatibility_date = "2026-06-01"
 
 [[kv_namespaces]]
 binding = "AETHERCLOCK_KV"
-id = "<your-kv-namespace-id>"
+id = "dd42f5546b3645eb9131b8189b172bf5"
 
 [triggers]
 crons = ["* * * * *"]

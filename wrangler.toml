@@ -4,8 +4,8 @@ compatibility_date = "2026-06-01"
 
 [[kv_namespaces]]
 binding = "AETHERCLOCK_KV"
-id = "<production-kv-namespace-id>"
-preview_id = "<preview-kv-namespace-id>"
+id = "dd42f5546b3645eb9131b8189b172bf5"
+preview_id = "1c04e784395a4012a84dedd669edf836"
 
 [vars]
 VAPID_PUBLIC_KEY = "BL2JGY9uq0EsSmL6AjM6IY5IDWuceAZSkRgigQzNSvBubkFOBU32h3khGzAO9epXiBzOYZqPcUOx3n0kjiE20ZE"
