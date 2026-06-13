@@ -275,3 +275,14 @@ After a configurable idle timeout (default 30s), a screen saver overlay activate
 - **YouTube IFrame API** — The player is initialized once and reused. Track changes call `loadVideoById`. The player is destroyed on unmount.
 - **Playlist generation is capped at 3 tracks** internally to avoid excessive API calls during pre-warm, even if the user sets track count to 4 or 5.
 - **Fallbacks use NoCopyrightSounds (NCS)** — all hardcoded fallback IDs are from NCS because they are royalty-free and widely embeddable.
+
+---
+
+## Web Push Background Alarm
+
+- Background notifications are delivered via Cloudflare KV + Web Push + a separate Cron Worker.
+- The Pages Functions API lives in `functions/`.
+- The Cron Worker lives in `cron-worker/` and is deployed separately.
+- VAPID secrets are never committed; use `.dev.vars` locally and Cloudflare secrets in production.
+- Shared alarm-matching logic is in `services/alarmServer.ts` and must stay environment-agnostic (no DOM/Node-only APIs).
+

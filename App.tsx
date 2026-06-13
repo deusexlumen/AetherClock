@@ -4,14 +4,19 @@ import { Visualizer } from './components/Visualizer';
 import { PlaylistViewer } from './components/PlaylistViewer';
 import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack } from './types';
 import { fetchWeather } from './services/weather';
-import { 
-  registerServiceWorker, 
-  requestNotificationPermission, 
-  sendAlarmNotification, 
-  isOnline, 
+import {
+  registerServiceWorker,
+  requestNotificationPermission,
+  sendAlarmNotification,
+  subscribeToPush,
+  unsubscribeFromPush,
+  getExistingPushSubscription,
+  isOnline,
   isStandalone,
-  captureInstallPrompt 
+  captureInstallPrompt,
 } from './services/pwa';
+import { fetchVapidPublicKey, syncDevice, syncAlarms, unsubscribeDevice } from './services/pushBackend';
+import { PushSubscriptionJSON } from './types';
 import { playOfflineFallback, stopOfflineFallback } from './services/offlineAudio';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { AlarmList } from './components/AlarmList';
@@ -283,6 +288,15 @@ const THEMES = {
 
 
 const App: React.FC = () => {
+  const getDeviceId = (): string => {
+    let id = localStorage.getItem('aetherclock_device_id');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('aetherclock_device_id', id);
+    }
+    return id;
+  };
+
   const initialAgenda = `0800 Drop Ava at nursery\n1000 Team meeting\n1200 lunch with Amanda\n1400 call with Jerry`;
 
   const [state, setState] = useState<AppState>(() => {
@@ -423,6 +437,14 @@ const App: React.FC = () => {
     saveAlarms(state.alarms);
   }, [state.alarms]);
 
+  // Sync alarms to the push backend whenever they change and a subscription exists
+  useEffect(() => {
+    if (!isOnline() || !pushSubscriptionRef.current) return;
+    syncAlarms(deviceIdRef.current, state.alarms).catch((err) =>
+      console.error('[Push] alarm sync failed', err)
+    );
+  }, [state.alarms]);
+
   // TTS Player instance
   const ttsPlayerRef = useRef(new TTSPlayer());
 
@@ -439,6 +461,8 @@ const App: React.FC = () => {
   const lastMinuteRef = useRef<string>('');
   const triggeredRef = useRef<Set<string>>(new Set());
   const prewarmedRef = useRef<Set<string>>(new Set());
+  const deviceIdRef = useRef<string>(getDeviceId());
+  const pushSubscriptionRef = useRef<PushSubscriptionJSON | null>(null);
 
   const getRecoveryVideoId = (index: number): string | null => {
     const playlistIds = state.playlist.map(t => t.youtubeVideoId).filter(Boolean) as string[];
@@ -489,6 +513,39 @@ const App: React.FC = () => {
     }
   };
 
+  const enablePushNotifications = async (): Promise<boolean> => {
+    let granted = false;
+    try {
+      granted = await requestNotificationPermission();
+    } catch (err) {
+      console.error('[Push] permission request failed', err);
+    }
+    if (!granted) {
+      setNotificationsEnabled(false);
+      localStorage.setItem('aetherclock_notifications', 'false');
+      return false;
+    }
+    try {
+      const publicKey = await fetchVapidPublicKey();
+      const subscription = await subscribeToPush(publicKey);
+      if (!subscription) {
+        setNotificationsEnabled(false);
+        localStorage.setItem('aetherclock_notifications', 'false');
+        return false;
+      }
+      pushSubscriptionRef.current = subscription.toJSON() as unknown as PushSubscriptionJSON;
+      await syncDevice(deviceIdRef.current, state.alarms, pushSubscriptionRef.current);
+      setNotificationsEnabled(true);
+      localStorage.setItem('aetherclock_notifications', 'true');
+      return true;
+    } catch (err) {
+      console.error('[Push] subscription failed', err);
+      setNotificationsEnabled(false);
+      localStorage.setItem('aetherclock_notifications', 'false');
+      return false;
+    }
+  };
+
   // Initialize GPS coords & weather
   useEffect(() => {
     if (navigator.geolocation) {
@@ -517,6 +574,19 @@ const App: React.FC = () => {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
     };
+  }, []);
+
+  // Restore existing push subscription on reload
+  useEffect(() => {
+    getExistingPushSubscription()
+      .then((subscription) => {
+        if (!subscription) return;
+        pushSubscriptionRef.current = subscription.toJSON() as unknown as PushSubscriptionJSON;
+        syncDevice(deviceIdRef.current, state.alarms, pushSubscriptionRef.current).catch((err) =>
+          console.error('[Push] restore subscription sync failed', err)
+        );
+      })
+      .catch((err) => console.error('[Push] restore subscription failed', err));
   }, []);
 
   // Online/Offline status
@@ -1544,12 +1614,21 @@ const App: React.FC = () => {
                                              onChange={async (e) => {
                                                  const enabled = e.target.checked;
                                                  if (enabled) {
-                                                     const granted = await requestNotificationPermission();
-                                                     setNotificationsEnabled(granted);
-                                                     localStorage.setItem('aetherclock_notifications', String(granted));
+                                                     const ok = await enablePushNotifications();
+                                                     if (!ok) {
+                                                         setNotificationsEnabled(false);
+                                                         localStorage.setItem('aetherclock_notifications', 'false');
+                                                     }
                                                  } else {
                                                      setNotificationsEnabled(false);
                                                      localStorage.setItem('aetherclock_notifications', 'false');
+                                                     try {
+                                                         await unsubscribeFromPush();
+                                                         await unsubscribeDevice(deviceIdRef.current);
+                                                         pushSubscriptionRef.current = null;
+                                                     } catch (err) {
+                                                         console.error('[Push] unsubscribe failed', err);
+                                                     }
                                                  }
                                              }}
                                              className="w-3 h-3 accent-radio-lit cursor-pointer"

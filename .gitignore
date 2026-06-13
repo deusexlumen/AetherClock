@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .worktrees/
+
+# Cloudflare local secrets
+.dev.vars
+cron-worker/.dev.vars
+.cloudflare-api-token
+
+# Wrangler local state
+.wrangler/

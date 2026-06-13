@@ -4,6 +4,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: false,
-    include: ['services/**/*.test.ts', 'components/**/*.test.ts'],
+    include: ['services/**/*.test.ts', 'components/**/*.test.ts', 'functions/**/*.test.ts'],
   },
 });

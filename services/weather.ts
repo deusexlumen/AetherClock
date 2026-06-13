@@ -10,7 +10,7 @@ export const fetchWeather = async (lat: number, lon: number): Promise<WeatherDat
       throw new Error('Weather service unavailable');
     }
 
-    const data = await response.json();
+    const data = await response.json() as { current_weather: { temperature: number; weathercode: number; is_day: number } };
     
     return {
       temperature: data.current_weather.temperature,
