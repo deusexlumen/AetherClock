@@ -9,4 +9,4 @@ preview_id = "1c04e784395a4012a84dedd669edf836"
 
 [vars]
 VAPID_PUBLIC_KEY = "BL2JGY9uq0EsSmL6AjM6IY5IDWuceAZSkRgigQzNSvBubkFOBU32h3khGzAO9epXiBzOYZqPcUOx3n0kjiE20ZE"
-VAPID_SUBJECT = "mailto:you@example.com"
+VAPID_SUBJECT = "mailto:buxloh@gmail.com"
