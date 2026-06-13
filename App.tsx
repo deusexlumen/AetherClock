@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Clock } from './components/Clock';
 import { Visualizer } from './components/Visualizer';
 import { PlaylistViewer } from './components/PlaylistViewer';
-import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack } from './types';
+import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack, Alarm } from './types';
 import { fetchWeather } from './services/weather';
 import { 
   registerServiceWorker, 
@@ -18,6 +18,7 @@ import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
 import { generatePlaylist, getNextTrackIndex, buildEmbedUrl, buildNcsChannelEmbedUrl } from './services/playlist';
+import { loadAlarms, saveAlarms, getNextAlarm, getAlarmStatusText, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
 import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
   Power, 
@@ -278,21 +279,7 @@ const THEMES = {
   }
 };
 
-const getPreAlarmTime = (alarmTimeStr: string): string => {
-  const [hrStr, minStr] = alarmTimeStr.split(':');
-  let hr = parseInt(hrStr, 10);
-  let min = parseInt(minStr, 10);
-  
-  min = min - 1; // Pre-warm 1 minute before to account for generation + validation time
-  if (min < 0) {
-    min = 60 + min;
-    hr = hr - 1;
-    if (hr < 0) {
-      hr = 23;
-    }
-  }
-  return `${hr.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
-};
+
 
 const App: React.FC = () => {
   const initialAgenda = `0800 Drop Ava at nursery\n1000 Team meeting\n1200 lunch with Amanda\n1400 call with Jerry`;
@@ -300,8 +287,8 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
     const calendar = parseAgendaToCalendar(initialAgenda);
     return {
-      alarmTime: "07:00",
-      isAlarmActive: false,
+      alarms: loadAlarms(),
+      currentAlarmId: null,
       agenda: initialAgenda,
       calendar,
       genrePreset: 'auto',
@@ -397,6 +384,29 @@ const App: React.FC = () => {
   const screenSaverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetScreenSaverTimerRef = useRef<() => void>(() => {});
 
+  const isAnyAlarmActive = useMemo(() => state.alarms.some((a) => a.isActive), [state.alarms]);
+  const currentAlarm = useMemo(
+    () => state.alarms.find((a) => a.id === state.currentAlarmId) ?? null,
+    [state.alarms, state.currentAlarmId]
+  );
+  const activeConfig = useMemo(() => {
+    if (currentAlarm) {
+      return {
+        genrePreset: currentAlarm.genrePreset,
+        playlistConfig: currentAlarm.playlistConfig,
+        voiceBriefingConfig: currentAlarm.voiceBriefingConfig,
+        alarmTime: currentAlarm.time,
+      };
+    }
+    const next = getNextAlarm(state.alarms);
+    return {
+      genrePreset: state.genrePreset,
+      playlistConfig,
+      voiceBriefingConfig,
+      alarmTime: next?.time ?? '07:00',
+    };
+  }, [currentAlarm, state.alarms, state.genrePreset, playlistConfig, voiceBriefingConfig]);
+
   // Screen saver logic
   const resetScreenSaverTimer = () => {
     if (screenSaverTimerRef.current) {
@@ -437,6 +447,9 @@ const App: React.FC = () => {
   const handleNextTrackRef = useRef<any>(() => {});
   const alarmPendingRef = useRef<boolean>(false);
   const errorRecoveryIndexRef = useRef<number>(0);
+  const lastMinuteRef = useRef<string>('');
+  const triggeredRef = useRef<Set<string>>(new Set());
+  const prewarmedRef = useRef<Set<string>>(new Set());
 
   const getRecoveryVideoId = (index: number): string | null => {
     const playlistIds = state.playlist.map(t => t.youtubeVideoId).filter(Boolean) as string[];
