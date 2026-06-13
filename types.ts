@@ -80,6 +80,8 @@ export interface AppState {
   alarms: Alarm[];
   // Alarm currently firing; null when no alarm triggered.
   currentAlarmId: string | null;
+  // Alarm whose generated playlist/briefing is currently cached; null if cache is empty/unowned.
+  generatedForAlarmId: string | null;
   agenda: string;
   calendar: CalendarItem[];
   genrePreset: MusicGenre;

@@ -289,6 +289,7 @@ const App: React.FC = () => {
     return {
       alarms: loadAlarms(),
       currentAlarmId: null,
+      generatedForAlarmId: null,
       agenda: initialAgenda,
       calendar,
       genrePreset: 'auto',
@@ -389,25 +390,6 @@ const App: React.FC = () => {
     () => state.alarms.find((a) => a.id === state.currentAlarmId) ?? null,
     [state.alarms, state.currentAlarmId]
   );
-  const activeConfig = useMemo(() => {
-    if (currentAlarm) {
-      return {
-        genrePreset: currentAlarm.genrePreset,
-        playlistConfig: currentAlarm.playlistConfig,
-        voiceBriefingConfig: currentAlarm.voiceBriefingConfig,
-        alarmTime: currentAlarm.time,
-      };
-    }
-    // Manual preview uses global defaults; scheduler passes an explicit alarm id.
-    const next = getNextAlarm(state.alarms);
-    return {
-      genrePreset: state.genrePreset,
-      playlistConfig,
-      voiceBriefingConfig,
-      alarmTime: next?.time ?? '07:00',
-    };
-  }, [currentAlarm, state.alarms, state.genrePreset, playlistConfig, voiceBriefingConfig]);
-
   // Screen saver logic
   const resetScreenSaverTimer = () => {
     if (screenSaverTimerRef.current) {
@@ -446,7 +428,7 @@ const App: React.FC = () => {
   const handleGenerateAndPlayRef = useRef<any>(() => {});
   const startPlaybackSequenceRef = useRef<any>(() => {});
   const handleNextTrackRef = useRef<any>(() => {});
-  const alarmPendingRef = useRef<boolean>(false);
+  const generationEpochRef = useRef<number>(0);
   const errorRecoveryIndexRef = useRef<number>(0);
   const lastMinuteRef = useRef<string>('');
   const triggeredRef = useRef<Set<string>>(new Set());
@@ -623,6 +605,7 @@ const App: React.FC = () => {
       const currentTime = `${hours}:${minutes}`;
       const currentDayKey = getCurrentWeekDay(now);
 
+      // Minute rollover: clear per-minute dedup sets so alarms can fire again in future minutes.
       if (lastMinuteRef.current !== currentTime) {
         lastMinuteRef.current = currentTime;
         triggeredRef.current.clear();
@@ -633,7 +616,7 @@ const App: React.FC = () => {
         if (!alarm.isActive) continue;
         if (alarm.days.length > 0 && !alarm.days.includes(currentDayKey)) continue;
 
-        const preKey = `${alarm.id}:${currentTime}`;
+        const prewarmKey = `${alarm.id}:${currentTime}`;
         const triggerKey = `${alarm.id}:${currentTime}`;
         const preAlarmTime = getPreAlarmTime(alarm.time);
 
@@ -641,16 +624,15 @@ const App: React.FC = () => {
           isPreWarmEnabled &&
           currentTime === preAlarmTime &&
           state.status === 'idle' &&
-          !prewarmedRef.current.has(preKey)
+          !prewarmedRef.current.has(prewarmKey)
         ) {
-          prewarmedRef.current.add(preKey);
+          prewarmedRef.current.add(prewarmKey);
           handleGenerateAndPlayRef.current(alarm.id, true);
         }
 
         if (currentTime === alarm.time && !triggeredRef.current.has(triggerKey)) {
           triggeredRef.current.add(triggerKey);
           setState((prev) => ({ ...prev, currentAlarmId: alarm.id }));
-          alarmPendingRef.current = false;
 
           if (!isOnlineStatus && offlineFallbackEnabled) {
             setState((prev) => ({ ...prev, status: 'playing' }));
@@ -662,18 +644,34 @@ const App: React.FC = () => {
           }
 
           if (state.status === 'ready') {
-            if (notificationsEnabled) {
-              sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
+            if (state.generatedForAlarmId === alarm.id) {
+              if (notificationsEnabled) {
+                sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
+              }
+              startPlaybackSequenceRef.current(state.briefingAudioSrc, state.playlist, alarm.voiceBriefingConfig);
+            } else {
+              if (notificationsEnabled) {
+                sendAlarmNotification('AetherClock', 'Generating your broadcast now...');
+              }
+              handleGenerateAndPlayRef.current(alarm.id, false);
             }
-            startPlaybackSequenceRef.current();
           } else if (state.status === 'idle') {
             if (notificationsEnabled) {
               sendAlarmNotification('AetherClock', 'Generating your broadcast now...');
             }
             handleGenerateAndPlayRef.current(alarm.id, false);
           } else {
-            alarmPendingRef.current = true;
+            // Interrupt any active playback for the new alarm.
+            ttsPlayerRef.current.stop();
+            stopOfflineFallback();
+            if (youtubePlayerRef.current && typeof youtubePlayerRef.current.stopVideo === 'function') {
+              youtubePlayerRef.current.stopVideo();
+            }
+            setState((prev) => ({ ...prev, status: 'idle' }));
+            handleGenerateAndPlayRef.current(alarm.id, false);
           }
+          // Only the first matching alarm per minute is triggered.
+          return;
         }
       }
     };
@@ -682,22 +680,6 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.alarms, state.status, isPreWarmEnabled, isOnlineStatus, offlineFallbackEnabled, notificationsEnabled]);
-
-  // Auto-trigger alarm when generation finishes and alarm time was reached
-  useEffect(() => {
-    if (state.status === 'ready' && alarmPendingRef.current && state.currentAlarmId) {
-      const alarm = state.alarms.find((a) => a.id === state.currentAlarmId);
-      if (!alarm) {
-        alarmPendingRef.current = false;
-        return;
-      }
-      alarmPendingRef.current = false;
-      if (notificationsEnabled) {
-        sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
-      }
-      startPlaybackSequenceRef.current();
-    }
-  }, [state.status, state.currentAlarmId, state.alarms, notificationsEnabled]);
 
   // Sync inputs
   const syncCalendarToAgenda = (newCalendar: CalendarItem[]) => {
@@ -745,120 +727,147 @@ const App: React.FC = () => {
   };
 
   // Generate Playlist and/or Briefing
-  const handleGenerateAndPlay = async (preGenerateOnly: boolean = false) => {
-    setState(prev => ({
+  const handleGenerateAndPlay = async (alarmId?: string, preGenerateOnly: boolean = false) => {
+    generationEpochRef.current += 1;
+    const epoch = generationEpochRef.current;
+
+    const alarm = alarmId ? state.alarms.find((a) => a.id === alarmId) : undefined;
+    if (alarmId && !alarm) {
+      setState((prev) => ({ ...prev, status: 'idle', currentAlarmId: null }));
+      return;
+    }
+
+    const config = alarm
+      ? {
+          genrePreset: alarm.genrePreset,
+          alarmTime: alarm.time,
+          playlistConfig: alarm.playlistConfig,
+          voiceBriefingConfig: alarm.voiceBriefingConfig,
+        }
+      : {
+          genrePreset: state.genrePreset,
+          alarmTime: getNextAlarm(state.alarms)?.time ?? '07:00',
+          playlistConfig,
+          voiceBriefingConfig,
+        };
+
+    setState((prev) => ({
       ...prev,
       status: 'generating_prompt',
       searchedTrack: null,
       playlist: [],
       currentTrackIndex: 0,
-      briefingAudioSrc: null
+      briefingAudioSrc: null,
+      currentAlarmId: alarm?.id ?? null,
+      generatedForAlarmId: null,
     }));
 
     try {
-      // 1. Generate first track / prompt
       const resultData = await generateMusicalPrompt(
         state.weather,
         state.location,
         state.agenda,
         new Date(),
-        state.alarmTime,
-        state.genrePreset,
+        config.alarmTime,
+        config.genrePreset,
         blacklist,
         llmConfig
       );
+      if (epoch !== generationEpochRef.current) return;
 
       let playlist: PlaylistTrack[] = [];
 
-      // 2. Generate Playlist (if enabled)
-      if (playlistConfig.enabled) {
-        const fetchTrack = () => generateMusicalPrompt(
-          state.weather, state.location, state.agenda, new Date(),
-          state.alarmTime, state.genrePreset, blacklist, llmConfig
-        ).then(r => r.searchedSong);
+      if (config.playlistConfig.enabled) {
+        const fetchTrack = () =>
+          generateMusicalPrompt(
+            state.weather,
+            state.location,
+            state.agenda,
+            new Date(),
+            config.alarmTime,
+            config.genrePreset,
+            blacklist,
+            llmConfig
+          ).then((r) => r.searchedSong);
 
-        playlist = await generatePlaylist(fetchTrack, playlistConfig.trackCount, state.genrePreset);
+        playlist = await generatePlaylist(fetchTrack, config.playlistConfig.trackCount, config.genrePreset);
+        if (epoch !== generationEpochRef.current) return;
       } else {
-        // Single track mode
         if (resultData.searchedSong.youtubeVideoId) {
           const videoId = resultData.searchedSong.youtubeVideoId;
-          playlist = [{
-            title: resultData.searchedSong.title,
-            artist: resultData.searchedSong.artist,
-            youtubeVideoId: videoId,
-            embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
-            whyExplanation: resultData.searchedSong.whyExplanation
-          }];
+          playlist = [
+            {
+              title: resultData.searchedSong.title,
+              artist: resultData.searchedSong.artist,
+              youtubeVideoId: videoId,
+              embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
+              whyExplanation: resultData.searchedSong.whyExplanation,
+            },
+          ];
         }
       }
 
-      // 3. Generate Voice Briefing (if enabled)
       let briefingSrc: string | null = null;
-      if (voiceBriefingConfig.enabled) {
-        setState(prev => ({ ...prev, status: 'generating_briefing' }));
+      if (config.voiceBriefingConfig.enabled) {
+        setState((prev) => ({ ...prev, status: 'generating_briefing' }));
         const briefing = await generateVoiceBriefing(
           state.weather,
           state.calendar,
-          state.alarmTime,
-          voiceBriefingConfig,
+          config.alarmTime,
+          config.voiceBriefingConfig,
           llmConfig
         );
         if (briefing.audioBase64) {
           briefingSrc = `data:${briefing.mimeType};base64,${briefing.audioBase64}`;
         }
+        if (epoch !== generationEpochRef.current) return;
       }
 
       const embedUrl = playlist[0]?.embedUrl || null;
 
-      if (preGenerateOnly) {
-        setState(prev => ({
-          ...prev,
-          status: 'ready',
-          searchedTrack: resultData.searchedSong,
-          youtubeEmbedUrl: embedUrl,
-          playlist,
-          currentTrackIndex: 0,
-          briefingAudioSrc: briefingSrc,
-        }));
-        return;
-      }
-
-      // Direct play
-      setState(prev => ({
+      if (epoch !== generationEpochRef.current) return;
+      setState((prev) => ({
         ...prev,
-        status: 'playing',
+        status: 'ready',
         searchedTrack: resultData.searchedSong,
         youtubeEmbedUrl: embedUrl,
         playlist,
         currentTrackIndex: 0,
         briefingAudioSrc: briefingSrc,
-        isAlarmActive: false,
+        generatedForAlarmId: alarm?.id ?? null,
       }));
+      if (preGenerateOnly) {
+        return;
+      }
+      startPlaybackSequenceRef.current(briefingSrc, playlist, config.voiceBriefingConfig);
     } catch (err: any) {
       console.error(err);
-      setState(prev => ({ ...prev, status: 'error', errorMessage: err?.message || 'Generation failed' }));
+      setState((prev) => ({ ...prev, status: 'error', errorMessage: err?.message || 'Generation failed' }));
     }
   };
 
   // Start actual playback sequence (briefing -> playlist track 0)
-  const startPlaybackSequence = () => {
-    if (state.briefingAudioSrc && voiceBriefingConfig.enabled) {
-      setState(prev => ({ ...prev, status: 'playing_briefing' }));
-      ttsPlayerRef.current.play(state.briefingAudioSrc, 'audio/wav', () => {
-        // TTS ended -> start first track
-        setState(prev => ({
+  const startPlaybackSequence = (
+    initialBriefingSrc: string | null,
+    initialPlaylist: PlaylistTrack[],
+    briefingConfig: VoiceBriefingConfig
+  ) => {
+    if (initialBriefingSrc && briefingConfig.enabled) {
+      setState((prev) => ({ ...prev, status: 'playing_briefing' }));
+      ttsPlayerRef.current.play(initialBriefingSrc, 'audio/wav', () => {
+        setState((prev) => ({
           ...prev,
           status: 'playing',
           currentTrackIndex: 0,
-          youtubeEmbedUrl: prev.playlist[0]?.embedUrl || null
+          youtubeEmbedUrl: initialPlaylist[0]?.embedUrl || null,
         }));
       });
     } else {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         status: 'playing',
         currentTrackIndex: 0,
-        youtubeEmbedUrl: prev.playlist[0]?.embedUrl || null
+        youtubeEmbedUrl: initialPlaylist[0]?.embedUrl || null,
       }));
     }
   };
@@ -874,15 +883,16 @@ const App: React.FC = () => {
       }
       return;
     }
-    const nextIndex = playlistConfig.shuffle
+    const shuffle = currentAlarm ? currentAlarm.playlistConfig.shuffle : playlistConfig.shuffle;
+    const nextIndex = shuffle
       ? getNextTrackIndex(state.currentTrackIndex, state.playlist.length, true)
       : (state.currentTrackIndex + 1) % state.playlist.length;
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       currentTrackIndex: nextIndex,
-      youtubeEmbedUrl: prev.playlist[nextIndex].embedUrl || null
+      youtubeEmbedUrl: prev.playlist[nextIndex].embedUrl || null,
     }));
-  }, [state.playlist.length, state.currentTrackIndex, playlistConfig.shuffle]);
+  }, [state.playlist.length, state.currentTrackIndex, currentAlarm, playlistConfig.shuffle]);
 
   const handlePrevTrack = useCallback(() => {
     errorRecoveryIndexRef.current = 0;
@@ -1891,7 +1901,10 @@ const App: React.FC = () => {
                      if (state.status === 'playing' || state.status === 'playing_briefing') {
                         ttsPlayerRef.current.stop();
                         stopOfflineFallback();
-                        setState(prev => ({ ...prev, status: 'idle' }));
+                        if (youtubePlayerRef.current && typeof youtubePlayerRef.current.stopVideo === 'function') {
+                          youtubePlayerRef.current.stopVideo();
+                        }
+                        setState(prev => ({ ...prev, status: 'idle', currentAlarmId: null }));
                      } else if (state.status === 'idle') {
                         handleGenerateAndPlay();
                      }
