@@ -126,6 +126,8 @@ export const formatCalendarToAgenda = (calendar: CalendarItem[]): string => {
     'lyria_notifications',
     'lyria_offline_fallback',
     'lyria_screensaver_timeout',
+    'lyria_alarm_time',
+    'lyria_alarm_active',
   ];
   for (const oldKey of legacyKeys) {
     try {
