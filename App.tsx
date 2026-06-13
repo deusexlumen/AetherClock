@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Clock } from './components/Clock';
 import { Visualizer } from './components/Visualizer';
 import { PlaylistViewer } from './components/PlaylistViewer';
-import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack, Alarm } from './types';
+import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack } from './types';
 import { fetchWeather } from './services/weather';
 import { 
   registerServiceWorker, 
@@ -18,7 +18,7 @@ import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
 import { generatePlaylist, getNextTrackIndex, buildEmbedUrl, buildNcsChannelEmbedUrl } from './services/playlist';
-import { loadAlarms, saveAlarms, getNextAlarm, getAlarmStatusText, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
+import { loadAlarms, getNextAlarm, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
 import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
   Power, 
@@ -398,6 +398,7 @@ const App: React.FC = () => {
         alarmTime: currentAlarm.time,
       };
     }
+    // Manual preview uses global defaults; scheduler passes an explicit alarm id.
     const next = getNextAlarm(state.alarms);
     return {
       genrePreset: state.genrePreset,
@@ -616,65 +617,87 @@ const App: React.FC = () => {
   // Alarm Check trigger loop
   useEffect(() => {
     const checkAlarm = () => {
-      if (!state.isAlarmActive) return;
-      
       const now = new Date();
       const hours = now.getHours().toString().padStart(2, '0');
       const minutes = now.getMinutes().toString().padStart(2, '0');
       const currentTime = `${hours}:${minutes}`;
-      const preAlarmTime = getPreAlarmTime(state.alarmTime);
+      const currentDayKey = getCurrentWeekDay(now);
 
-      // 1. Pre-warm option (60 seconds before)
-      if (isPreWarmEnabled && currentTime === preAlarmTime && state.status === 'idle') {
-         handleGenerateAndPlayRef.current(true);
+      if (lastMinuteRef.current !== currentTime) {
+        lastMinuteRef.current = currentTime;
+        triggeredRef.current.clear();
+        prewarmedRef.current.clear();
       }
 
-      // 2. Main alarm match trigger
-      if (currentTime === state.alarmTime) {
-         alarmPendingRef.current = false;
-         if (!isOnlineStatus && offlineFallbackEnabled) {
-            setState(prev => ({ ...prev, status: 'playing', isAlarmActive: false }));
+      for (const alarm of state.alarms) {
+        if (!alarm.isActive) continue;
+        if (alarm.days.length > 0 && !alarm.days.includes(currentDayKey)) continue;
+
+        const preKey = `${alarm.id}:${currentTime}`;
+        const triggerKey = `${alarm.id}:${currentTime}`;
+        const preAlarmTime = getPreAlarmTime(alarm.time);
+
+        if (
+          isPreWarmEnabled &&
+          currentTime === preAlarmTime &&
+          state.status === 'idle' &&
+          !prewarmedRef.current.has(preKey)
+        ) {
+          prewarmedRef.current.add(preKey);
+          handleGenerateAndPlayRef.current(alarm.id, true);
+        }
+
+        if (currentTime === alarm.time && !triggeredRef.current.has(triggerKey)) {
+          triggeredRef.current.add(triggerKey);
+          setState((prev) => ({ ...prev, currentAlarmId: alarm.id }));
+          alarmPendingRef.current = false;
+
+          if (!isOnlineStatus && offlineFallbackEnabled) {
+            setState((prev) => ({ ...prev, status: 'playing' }));
             playOfflineFallback();
             if (notificationsEnabled) {
-              sendAlarmNotification('AetherClock Alarm', 'Wake up! Playing offline fallback alarm.');
+              sendAlarmNotification('AetherClock Alarm', `Wake up! ${alarm.label}`);
             }
             return;
-         }
+          }
 
-         if (state.status === 'ready') {
-            setState(prev => ({ ...prev, isAlarmActive: false }));
+          if (state.status === 'ready') {
             if (notificationsEnabled) {
               sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
             }
             startPlaybackSequenceRef.current();
-         } else if (state.status === 'idle') {
-            setState(prev => ({ ...prev, isAlarmActive: false }));
+          } else if (state.status === 'idle') {
             if (notificationsEnabled) {
               sendAlarmNotification('AetherClock', 'Generating your broadcast now...');
             }
-            handleGenerateAndPlayRef.current(false);
-         } else {
-            // Generation still in progress — auto-trigger when ready
+            handleGenerateAndPlayRef.current(alarm.id, false);
+          } else {
             alarmPendingRef.current = true;
-         }
+          }
+        }
       }
     };
+
     const interval = setInterval(checkAlarm, 1000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.isAlarmActive, state.status, state.alarmTime, isPreWarmEnabled, isOnlineStatus, offlineFallbackEnabled, notificationsEnabled]);
+  }, [state.alarms, state.status, isPreWarmEnabled, isOnlineStatus, offlineFallbackEnabled, notificationsEnabled]);
 
   // Auto-trigger alarm when generation finishes and alarm time was reached
   useEffect(() => {
-    if (state.status === 'ready' && alarmPendingRef.current && state.isAlarmActive) {
+    if (state.status === 'ready' && alarmPendingRef.current && state.currentAlarmId) {
+      const alarm = state.alarms.find((a) => a.id === state.currentAlarmId);
+      if (!alarm) {
+        alarmPendingRef.current = false;
+        return;
+      }
       alarmPendingRef.current = false;
-      setState(prev => ({ ...prev, isAlarmActive: false }));
       if (notificationsEnabled) {
         sendAlarmNotification('AetherClock', 'Your personalized broadcast is starting.');
       }
       startPlaybackSequenceRef.current();
     }
-  }, [state.status, state.isAlarmActive, notificationsEnabled]);
+  }, [state.status, state.currentAlarmId, state.alarms, notificationsEnabled]);
 
   // Sync inputs
   const syncCalendarToAgenda = (newCalendar: CalendarItem[]) => {
