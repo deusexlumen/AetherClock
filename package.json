@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "dev:pages": "wrangler pages dev dist --local",
+    "deploy:cron": "wrangler deploy --config cron-worker/wrangler.toml",
+    "generate-vapid": "tsx scripts/generate-vapid-keys.ts"
   },
   "dependencies": {
     "@babylonjs/core": "^9.10.1",
@@ -22,10 +25,14 @@
     "reactylon": "^0.0.75"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260613.1",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "tsx": "^4.22.4",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.8",
+    "web-push-neo": "^0.1.2",
+    "wrangler": "^4.100.0"
   }
 }

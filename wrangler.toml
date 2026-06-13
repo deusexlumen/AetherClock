@@ -1,0 +1,12 @@
+name = "aetherclock"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-06-01"
+
+[[kv_namespaces]]
+binding = "AETHERCLOCK_KV"
+id = "<production-kv-namespace-id>"
+preview_id = "<preview-kv-namespace-id>"
+
+[vars]
+VAPID_PUBLIC_KEY = "BL2JGY9uq0EsSmL6AjM6IY5IDWuceAZSkRgigQzNSvBubkFOBU32h3khGzAO9epXiBzOYZqPcUOx3n0kjiE20ZE"
+VAPID_SUBJECT = "mailto:you@example.com"
