@@ -4,7 +4,12 @@ export interface PWAState {
   notificationsEnabled: boolean;
 }
 
-let deferredPrompt: any = null;
+type InstallPromptEvent = Event & {
+  prompt: () => void;
+  userChoice: Promise<{ outcome: string }>;
+};
+
+let deferredPrompt: InstallPromptEvent | null = null;
 
 export const registerServiceWorker = async (): Promise<void> => {
   if ('serviceWorker' in navigator) {
@@ -19,12 +24,13 @@ export const registerServiceWorker = async (): Promise<void> => {
 
 export const captureInstallPrompt = (event: Event): void => {
   event.preventDefault();
-  deferredPrompt = event;
+  deferredPrompt = event as InstallPromptEvent;
 };
 
-export const getDeferredPrompt = (): any => {
+export const getDeferredPrompt = (): InstallPromptEvent | null => {
   if (deferredPrompt) return deferredPrompt;
-  return (window as any).deferredInstallPrompt || null;
+  const win = window as unknown as Window & { deferredInstallPrompt?: InstallPromptEvent | null };
+  return win.deferredInstallPrompt || null;
 };
 
 export const clearDeferredPrompt = (): void => {
@@ -32,9 +38,10 @@ export const clearDeferredPrompt = (): void => {
 };
 
 export const installPWA = async (): Promise<boolean> => {
-  if (!deferredPrompt) return false;
-  (deferredPrompt as any).prompt();
-  const { outcome } = await (deferredPrompt as any).userChoice;
+  const prompt = getDeferredPrompt();
+  if (!prompt) return false;
+  prompt.prompt();
+  const { outcome } = await prompt.userChoice;
   deferredPrompt = null;
   return outcome === 'accepted';
 };
@@ -55,18 +62,55 @@ export const sendAlarmNotification = (title: string, body: string): void => {
       url: window.location.href
     });
   } else {
-    new Notification(title, {
+    const options: NotificationOptions & { vibrate?: number[] } = {
       body,
       icon: '/icon.svg',
       requireInteraction: true,
       vibrate: [200, 100, 200, 100, 200]
-    } as any);
+    };
+    new Notification(title, options);
   }
 };
 
 export const isOnline = (): boolean => navigator.onLine;
 
 export const isStandalone = (): boolean => {
+  const nav = navigator as Navigator & { standalone?: boolean };
   return (window.matchMedia('(display-mode: standalone)').matches) ||
-         ((window as any).navigator?.standalone === true);
+         (nav.standalone === true);
+};
+
+const urlBase64ToUint8Array = (base64url: string): Uint8Array => {
+  const padding = '='.repeat((4 - (base64url.length % 4)) % 4);
+  const base64 = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+};
+
+export const getExistingPushSubscription = async (): Promise<PushSubscription | null> => {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  const registration = await navigator.serviceWorker.ready;
+  return registration.pushManager.getSubscription();
+};
+
+export const subscribeToPush = async (vapidPublicKey: string): Promise<PushSubscription | null> => {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+  });
+  return subscription;
+};
+
+export const unsubscribeFromPush = async (): Promise<boolean> => {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (subscription) {
+    return subscription.unsubscribe();
+  }
+  return false;
 };

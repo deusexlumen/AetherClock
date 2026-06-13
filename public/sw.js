@@ -80,3 +80,19 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SHOW_NOTIFICATION') {
+    event.waitUntil(
+      self.registration.showNotification(event.data.title || 'AetherClock', {
+        body: event.data.body || 'Your alarm is ringing.',
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        tag: 'aetherclock-alarm',
+        requireInteraction: true,
+        vibrate: [200, 100, 200, 100, 200],
+        data: { url: event.data.url || '/' },
+      })
+    );
+  }
+});
