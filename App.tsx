@@ -14,11 +14,12 @@ import {
 } from './services/pwa';
 import { playOfflineFallback, stopOfflineFallback } from './services/offlineAudio';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { AlarmList } from './components/AlarmList';
 import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
 import { generatePlaylist, getNextTrackIndex, buildEmbedUrl, buildNcsChannelEmbedUrl } from './services/playlist';
-import { loadAlarms, getNextAlarm, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
+import { loadAlarms, saveAlarms, getNextAlarm, getAlarmStatusText, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
 import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
   Power, 
@@ -1284,6 +1285,23 @@ const App: React.FC = () => {
                          </div>
                      </div>
 
+                     {/* Alarms */}
+                     <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
+                         <div className="flex items-center gap-2">
+                             <Bell className="w-3 h-3 text-radio-lit" />
+                             <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">Alarms</span>
+                         </div>
+                         <AlarmList
+                             alarms={state.alarms}
+                             onChange={(nextAlarms) => {
+                               saveAlarms(nextAlarms);
+                               setState((prev) => ({ ...prev, alarms: nextAlarms }));
+                             }}
+                             defaultPlaylistConfig={playlistConfig}
+                             defaultVoiceBriefingConfig={voiceBriefingConfig}
+                         />
+                     </div>
+
                      {/* 2. Output Volume Level */}
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                          <div className="flex flex-col gap-1">
@@ -1583,7 +1601,7 @@ const App: React.FC = () => {
                 )}
 
                 <div className="flex-grow flex flex-col justify-center gap-4">
-                    <Clock className="mb-2" isAlarmActive={state.isAlarmActive} />
+                    <Clock className="mb-2" isAlarmActive={isAnyAlarmActive} />
                     
                     {/* TUNED SEARCH TRACK RETRO DISPLAY: Displays discovered song context */}
                     {state.searchedTrack ? (
@@ -1701,7 +1719,6 @@ const App: React.FC = () => {
                                 setState(prev => ({ 
                                   ...prev, 
                                   genrePreset: station,
-                                  isAlarmActive: true,
                                   searchedTrack: null,
                                   playlist: [],
                                   currentTrackIndex: 0
@@ -1869,30 +1886,16 @@ const App: React.FC = () => {
 
             {/* Bottom: Control Deck */}
             <div id="btn-con-deck" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-auto">
-                
-                {/* Alarm Time Set Dial Input */}
-                <div id="deck-dial-time" className="col-span-2 bg-radio-btn rounded shadow-btn active:shadow-btn-pressed transition-all relative overflow-hidden group border-t border-white/5 focus-within:ring-2 focus-within:ring-radio-lit focus-within:ring-inset">
-                     <label htmlFor="wake-time-input" className="absolute top-2 left-3 text-[8px] font-bold text-gray-500 uppercase tracking-wider">Wake-Up Dial</label>
-                     <input 
-                        id="wake-time-input"
-                        type="time" 
-                        className="w-full h-full bg-transparent text-center font-digital text-gray-200 text-2xl pt-5 cursor-pointer outline-none focus:text-radio-lit transition-colors"
-                        value={state.alarmTime}
-                        onChange={(e) => setState(prev => ({ ...prev, alarmTime: e.target.value, isAlarmActive: true }))}
-                     />
-                </div>
-
-                {/* Alarm Toggle Active Push Lock */}
-                <button 
-                    id="deck-btn-toggle"
-                    onClick={() => setState(prev => ({ ...prev, isAlarmActive: !prev.isAlarmActive }))}
-                    className={`btn-spring col-span-1 rounded shadow-btn active:shadow-btn-pressed flex flex-col items-center justify-center p-2 border-t border-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit focus-visible:ring-inset bg-radio-btn hover:bg-neutral-800`}
-                    aria-pressed={state.isAlarmActive}
-                    aria-label="Toggle Alarm Activation"
+                {/* Next Alarm Summary */}
+                <div
+                    id="deck-next-alarm"
+                    className="col-span-1 sm:col-span-3 bg-radio-btn rounded shadow-btn active:shadow-btn-pressed transition-all relative overflow-hidden group border-t border-white/5 p-3 flex flex-col justify-center"
                 >
-                    <div className={`w-2 h-2 rounded-full mb-1 ${state.isAlarmActive ? 'bg-radio-lit led-warm-up' : 'bg-black border border-gray-750 opacity-50'}`} style={{ color: 'var(--radio-lit)' }}></div>
-                    <span className={`text-[10px] font-bold uppercase transition-colors ${state.isAlarmActive ? 'text-gray-200' : 'text-gray-500'}`}>Active</span>
-                </button>
+                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Next Broadcast</span>
+                    <span className="text-sm sm:text-base font-mono text-radio-lit uppercase tracking-wider truncate led-text-shadow">
+                        {getAlarmStatusText(state.alarms)}
+                    </span>
+                </div>
 
                 {/* Big Action Render Button */}
                 <button
@@ -1953,8 +1956,8 @@ const App: React.FC = () => {
           onClick={() => setIsScreenSaverActive(false)}
         >
           <div className="text-center">
-            <Clock isAlarmActive={state.isAlarmActive} />
-            {state.isAlarmActive && (
+            <Clock isAlarmActive={isAnyAlarmActive} />
+            {isAnyAlarmActive && (
               <div className="mt-4 flex items-center justify-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-radio-lit animate-pulse shadow-[0_0_8px_rgba(255,51,51,0.8)]" />
                 <span className="text-radio-lit font-mono text-xs uppercase tracking-widest">Alarm Armed</span>

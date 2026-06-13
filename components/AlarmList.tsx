@@ -172,6 +172,7 @@ export const AlarmList: React.FC<AlarmListProps> = ({
                       : 'bg-neutral-850 text-gray-500 hover:text-gray-300'
                   }`}
                   aria-pressed={alarm.days.includes(day)}
+                  aria-label={day}
                 >
                   {DAY_LABELS[day]}
                 </button>
