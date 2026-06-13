@@ -11,6 +11,7 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
   getExistingPushSubscription,
+  notifyServiceWorkerDeviceId,
   isOnline,
   isStandalone,
   captureInstallPrompt,
@@ -535,6 +536,7 @@ const App: React.FC = () => {
       }
       pushSubscriptionRef.current = subscription.toJSON() as unknown as PushSubscriptionJSON;
       await syncDevice(deviceIdRef.current, state.alarms, pushSubscriptionRef.current);
+      notifyServiceWorkerDeviceId(deviceIdRef.current);
       setNotificationsEnabled(true);
       localStorage.setItem('aetherclock_notifications', 'true');
       return true;
@@ -576,12 +578,13 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Restore existing push subscription on reload
+  // Restore existing push subscription on reload and tell the SW our device id
   useEffect(() => {
     getExistingPushSubscription()
       .then((subscription) => {
         if (!subscription) return;
         pushSubscriptionRef.current = subscription.toJSON() as unknown as PushSubscriptionJSON;
+        notifyServiceWorkerDeviceId(deviceIdRef.current);
         syncDevice(deviceIdRef.current, state.alarms, pushSubscriptionRef.current).catch((err) =>
           console.error('[Push] restore subscription sync failed', err)
         );
@@ -589,17 +592,33 @@ const App: React.FC = () => {
       .catch((err) => console.error('[Push] restore subscription failed', err));
   }, []);
 
-  // Online/Offline status
+  // Tell a newly activated service worker our device id (e.g. after an update)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handler = () => notifyServiceWorkerDeviceId(deviceIdRef.current);
+    navigator.serviceWorker.addEventListener('controllerchange', handler);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', handler);
+  }, []);
+
+  // Online/Offline status + resync alarms when connectivity returns
   useEffect(() => {
     const updateOnline = () => setIsOnlineStatus(isOnline());
-    window.addEventListener('online', updateOnline);
+    const handleOnline = () => {
+      updateOnline();
+      if (pushSubscriptionRef.current) {
+        syncAlarms(deviceIdRef.current, state.alarms).catch((err) =>
+          console.error('[Push] online resync failed', err)
+        );
+      }
+    };
+    window.addEventListener('online', handleOnline);
     window.addEventListener('offline', updateOnline);
     setIsOnlineStatus(isOnline());
     return () => {
-      window.removeEventListener('online', updateOnline);
+      window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', updateOnline);
     };
-  }, []);
+  }, [state.alarms]);
 
   // Set YouTube player volume on change
   useEffect(() => {
