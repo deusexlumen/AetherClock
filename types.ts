@@ -12,6 +12,21 @@ export interface CalendarItem {
   active: boolean;
 }
 
+export type WeekDay = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+
+export const WEEKDAYS: WeekDay[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+export interface Alarm {
+  id: string;
+  time: string; // "HH:MM"
+  label: string;
+  isActive: boolean;
+  days: WeekDay[];
+  genrePreset: MusicGenre;
+  playlistConfig: PlaylistConfig;
+  voiceBriefingConfig: VoiceBriefingConfig;
+}
+
 export type MusicGenre = 'auto' | 'synthwave' | 'acoustic' | 'lofi' | 'rock' | 'classical' | 'jazz' | 'pop' | 'ambient' | 'hiphop';
 
 export interface SearchedSongMetadata {
@@ -58,8 +73,8 @@ export interface PlaylistConfig {
 export type AppStatus = 'idle' | 'generating_prompt' | 'generating_briefing' | 'ready' | 'playing_briefing' | 'playing' | 'error';
 
 export interface AppState {
-  alarmTime: string;
-  isAlarmActive: boolean;
+  alarms: Alarm[];
+  currentAlarmId: string | null;
   agenda: string;
   calendar: CalendarItem[];
   genrePreset: MusicGenre;
