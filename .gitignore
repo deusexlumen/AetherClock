@@ -28,3 +28,6 @@ dist-ssr
 .dev.vars
 cron-worker/.dev.vars
 .cloudflare-api-token
+
+# Wrangler local state
+.wrangler/

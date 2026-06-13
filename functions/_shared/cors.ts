@@ -2,10 +2,13 @@ import type { Request as CfRequest, Response as CfResponse } from '@cloudflare/w
 
 const ALLOWED_ORIGINS = ['https://aetherclock.pages.dev', 'http://localhost:5173', 'http://localhost:8788'];
 
+const isAllowedOrigin = (origin: string): boolean =>
+  ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.aetherclock.pages.dev');
+
 export const corsHeaders = (request: CfRequest): Record<string, string> => {
   const origin = request.headers.get('Origin') || '';
   return {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Vary': 'Origin',
