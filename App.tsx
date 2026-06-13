@@ -17,7 +17,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
-import { generatePlaylist, buildEmbedUrl, getNextTrackIndex } from './services/playlist';
+import { generatePlaylist, buildEmbedUrl, getNextTrackIndex, REPUTABLE_YOUTUBE_FALLBACKS } from './services/playlist';
 import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
   Power, 
@@ -406,8 +406,10 @@ const App: React.FC = () => {
 
   const getRecoveryVideoId = (index: number): string | null => {
     const playlistIds = state.playlist.map(t => t.youtubeVideoId).filter(Boolean);
-    if (playlistIds.length === 0) return null;
-    return playlistIds[index % playlistIds.length];
+    const emergencyIds = Object.values(REPUTABLE_YOUTUBE_FALLBACKS).flat();
+    const allIds = [...new Set([...playlistIds, ...emergencyIds])];
+    if (allIds.length === 0) return null;
+    return allIds[index % allIds.length];
   };
   // Dual-Planner Tabs
   const [plannerTab, setPlannerTab] = useState<'interactive' | 'textarea'>('interactive');
@@ -862,12 +864,13 @@ const App: React.FC = () => {
           },
           onError: (event: any) => {
             console.warn('[YT] Player error code:', event.data);
-            // Embedding errors: 100=not found, 101/150=embedding disabled
+            // Embedding errors: 100=not found, 101/150=embedding disabled, 2=invalid param, 5=HTML5 error
             errorRecoveryIndexRef.current += 1;
             const nextId = getRecoveryVideoId(errorRecoveryIndexRef.current);
             if (!nextId) {
-              console.error('[YT] No playable video IDs available.');
-              setState(prev => ({ ...prev, status: 'error', errorMessage: 'No embeddable video found. Try a different station or tune in again.' }));
+              console.error('[YT] Alle Recovery-IDs erschoepft — springe zum naechsten Track.');
+              errorRecoveryIndexRef.current = 0;
+              handleNextTrackRef.current();
               return;
             }
             console.log('[YT] Retrying with recovery ID:', nextId);

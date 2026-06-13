@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { WeatherData, WEATHER_CODES, MusicGenre, SearchedSongMetadata, LLMConfig } from '../types';
 
 // Default model (can be overridden via config)
-const DEFAULT_MODEL_TEXT = "gemini-3.5-flash";
+const DEFAULT_MODEL_TEXT = "gemini-3.1-flash";
 
 export interface MusicalPromptResult {
   searchedSong: SearchedSongMetadata;
@@ -55,18 +55,18 @@ export const generateMusicalPrompt = async (
     3. Customize the original lyrics of that song (or write a fresh custom adaptation) to incorporate the user's specific context (like mentioning their specific active agenda item, current outdoor temperature/weather, and alarm time).
     
     CRITICAL YOUTUBE RULES:
-    - You MUST ONLY return a youtubeVideoId if you are 100% certain the video is embeddable in a third-party iframe.
-    - FORBIDDEN: Official VEVO channels, major label channels (Universal, Sony, Warner), and "official music video" uploads — these almost always block embedding with "Video unavailable".
-    - ALLOWED: Lyric videos, clean audio uploads, live acoustic sessions, creative-commons covers, fan uploads labeled "audio" or "lyrics", and smaller independent artist channels.
-    - If you cannot find a guaranteed embeddable version, OMIT the youtubeVideoId field entirely. Do NOT guess an ID.
+    - You MUST return a youtubeVideoId for the song you selected. This field is REQUIRED, not optional.
+    - Search for the best embeddable version: prefer lyric videos, audio uploads, live sessions, or creative-commons covers.
+    - If no alternative version exists, the official music video or artist channel upload is acceptable — most allow embedding.
     - Only return the exact 11-character ID, never a full URL.
+    - NEVER omit the youtubeVideoId field. If you cannot find a specific ID, return the most popular upload's ID for that song.
     
     You MUST respond with a valid, clean, parseable JSON object matching this schema:
     {
       "searchedSong": {
         "title": "Name of the real song you found",
         "artist": "Name of the artist of that song",
-        "youtubeVideoId": "The exact 11-character YouTube video ID (ONLY if you found a guaranteed embeddable version such as lyrics, clean audio, or creative commons cover). Otherwise omit this field entirely.",
+        "youtubeVideoId": "The exact 11-character YouTube video ID (REQUIRED)",
         "whyExplanation": "Clear explanation of how the song matches the time of day, active appointment, or theme preset",
         "foundTheme": "One-word theme keyword (e.g., Morning, Energetic, Cozy, Productive, Relax)",
         "styleDescription": "Detailed musical style, speed, and instrumentation matching the selected genre preset"
@@ -109,7 +109,7 @@ export const generateMusicalPrompt = async (
 
     const bodyText = response.text || "";
     try {
-      const cleanedText = bodyText.trim().replace(/^```json/, '').replace(/```$/, '').trim();
+      const cleanedText = bodyText.trim().replace(/^\`\`\`json/, '').replace(/\`\`\`$/, '').trim();
       const result: MusicalPromptResult = JSON.parse(cleanedText);
       return result;
     } catch (parseError) {
@@ -126,7 +126,7 @@ export const generateMusicalPrompt = async (
         searchedSong: {
           title: titleMatch ? titleMatch[1] : `Morning Rise`,
           artist: artistMatch ? artistMatch[1] : "The Radiance",
-          youtubeVideoId: ytMatch ? ytMatch[1] : undefined,
+          youtubeVideoId: ytMatch ? ytMatch[1] : 'btPJPFnesV4',
           whyExplanation: whyMatch ? whyMatch[1] : "Tuned to a cheerful, bright and motivating theme to welcome the day.",
           foundTheme: "Wake Up",
           styleDescription: `Genre preset: ${genrePreset}`
@@ -141,6 +141,7 @@ export const generateMusicalPrompt = async (
       searchedSong: {
         title: "Lovely Day",
         artist: "Bill Withers",
+        youtubeVideoId: "btPJPFnesV4",
         whyExplanation: "A classic positive morning anthem to lift spirits regardless of weather.",
         foundTheme: "Inspirational",
         styleDescription: "Acoustic soul with rich horns and positive vocal delivery"

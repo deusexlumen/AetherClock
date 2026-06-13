@@ -1,7 +1,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { WeatherData, WEATHER_CODES, CalendarItem, VoiceBriefingConfig, LLMConfig } from '../types';
 
-const DEFAULT_TTS_MODEL = "gemini-3.1-flash-tts-preview";
+const DEFAULT_TTS_MODEL = "gemini-3.1-flash";
 
 export interface BriefingResult {
   audioBase64: string;

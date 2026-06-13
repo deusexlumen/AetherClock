@@ -1,18 +1,29 @@
 // BUXE_OS v24.X -- PLAYLIST SERVICE
 import { MusicGenre, PlaylistTrack, SearchedSongMetadata } from '../types';
 
-// Garantiert embeddable Fallback-Videos (Lofi-Radio Streams)
+// Garantiert embeddable Fallback-Videos (keine Livestreams — echte Musikvideos)
 export const REPUTABLE_YOUTUBE_FALLBACKS: Record<MusicGenre, string[]> = {
-  auto: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  synthwave: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  acoustic: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  lofi: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  rock: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  classical: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  jazz: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  pop: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  ambient: ['jfKfPfyJRdk', '5qap5aO4i9A'],
-  hiphop: ['jfKfPfyJRdk', '5qap5aO4i9A'],
+  auto: ['kJQP7kiw5Fk', 'RgKAFK5djSk', 'JGwWNGJdvx8'],
+  synthwave: ['4NRXx6U8ABQ', 'JGwWNGJdvx8', 'kJQP7kiw5Fk'],
+  acoustic: ['JGwWNGJdvx8', 'RgKAFK5djSk', 'CevxZvSJLk8'],
+  lofi: ['JGwWNGJdvx8', 'RgKAFK5djSk', 'kJQP7kiw5Fk'],
+  rock: ['btPJPFnesV4', 'eVTXPUF4Oz4', 'CevxZvSJLk8'],
+  classical: ['RgKAFK5djSk', 'JGwWNGJdvx8', 'kJQP7kiw5Fk'],
+  jazz: ['RgKAFK5djSk', 'kJQP7kiw5Fk', 'JGwWNGJdvx8'],
+  pop: ['kJQP7kiw5Fk', 'CevxZvSJLk8', 'JGwWNGJdvx8'],
+  ambient: ['RgKAFK5djSk', 'JGwWNGJdvx8', 'kJQP7kiw5Fk'],
+  hiphop: ['RgKAFK5djSk', 'kJQP7kiw5Fk', 'JGwWNGJdvx8'],
+};
+
+// Fallback-Metadaten für bekannte IDs, damit der Name im UI stimmt
+export const FALLBACK_TRACK_INFO: Record<string, { title: string; artist: string; whyExplanation: string }> = {
+  'kJQP7kiw5Fk': { title: 'Despacito', artist: 'Luis Fonsi', whyExplanation: 'Pop-energy fallback tuned to your station preset.' },
+  'RgKAFK5djSk': { title: 'See You Again', artist: 'Wiz Khalifa', whyExplanation: 'Melodic fallback tuned to your station preset.' },
+  'JGwWNGJdvx8': { title: 'Shape of You', artist: 'Ed Sheeran', whyExplanation: 'Chill-rhythm fallback tuned to your station preset.' },
+  'btPJPFnesV4': { title: 'Eye of the Tiger', artist: 'Survivor', whyExplanation: 'High-energy rock fallback tuned to your station preset.' },
+  'eVTXPUF4Oz4': { title: 'In The End', artist: 'Linkin Park', whyExplanation: 'Alt-rock fallback tuned to your station preset.' },
+  'CevxZvSJLk8': { title: 'Roar', artist: 'Katy Perry', whyExplanation: 'Pop-anthem fallback tuned to your station preset.' },
+  '4NRXx6U8ABQ': { title: 'Blinding Lights', artist: 'The Weeknd', whyExplanation: 'Synthwave fallback tuned to your station preset.' },
 };
 
 export const buildEmbedUrl = (videoId: string | null | undefined): string | null => {
@@ -48,16 +59,30 @@ export const generatePlaylist = async (
 
   for (const meta of results) {
     if (!meta) continue;
-    const videoId = meta.youtubeVideoId?.trim();
+    let videoId = meta.youtubeVideoId?.trim();
+
+    // Wenn die KI kein Video-ID liefert, weise ein passendes Fallback-Video zu
+    // aber behalte die kuratierten Metadaten bei
+    if (!videoId) {
+      let attempts = 0;
+      do {
+        videoId = getFallbackVideoId(genre);
+        attempts++;
+      } while (usedIds.has(videoId) && attempts < 10);
+    }
+
     if (!videoId) continue;
     if (usedIds.has(videoId)) continue;
     usedIds.add(videoId);
 
+    // Falls es ein bekannter Fallback ist, zeige den echten Songnamen an
+    const fallbackInfo = FALLBACK_TRACK_INFO[videoId];
+
     tracks.push({
-      title: meta.title,
-      artist: meta.artist,
+      title: meta.title || fallbackInfo?.title || 'Radio Broadcast',
+      artist: meta.artist || fallbackInfo?.artist || 'AetherClock Radio',
       youtubeVideoId: videoId,
-      whyExplanation: meta.whyExplanation,
+      whyExplanation: meta.whyExplanation || fallbackInfo?.whyExplanation || 'Emergency fallback signal tuned to your station preset.',
     });
   }
 
@@ -66,11 +91,12 @@ export const generatePlaylist = async (
     const fallbackId = getFallbackVideoId(genre);
     if (!usedIds.has(fallbackId)) {
       usedIds.add(fallbackId);
+      const info = FALLBACK_TRACK_INFO[fallbackId];
       tracks.push({
-        title: 'Fallback Broadcast',
-        artist: 'AetherClock Radio',
+        title: info?.title || 'Radio Broadcast',
+        artist: info?.artist || 'AetherClock Radio',
         youtubeVideoId: fallbackId,
-        whyExplanation: 'Emergency fallback signal tuned to your station preset.',
+        whyExplanation: info?.whyExplanation || 'Emergency fallback signal tuned to your station preset.',
       });
     } else {
       // Wenn alle Fallbacks schon verbraucht sind, abbrechen um Endlosschleife zu vermeiden
