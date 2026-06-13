@@ -57,7 +57,7 @@ export function buildSpaceScene(engine: Engine, fftData?: Float32Array): Scene {
   planet.position = new Vector3(5, -2, -5);
 
   // Post-processing
-  const pipeline = new DefaultRenderingPipeline('post', true, scene, [camera]);
+  const pipeline = new DefaultRenderingPipeline('post', true, scene, [camera]) as any;
   pipeline.bloomEnabled = true;
   pipeline.bloomWeight = 1.2;
   pipeline.bloomThreshold = 0.5;

@@ -1,15 +1,14 @@
-# AetherClock / Lyria Radio Alarm Clock — Agent Guide
+# AetherClock — Agent Guide
 
 ## Project Overview
 
-**AetherClock** (also referred to as *Lyria Radio Alarm Clock* or *Lyria Radio*) is an AI-powered, retro-styled alarm clock web application. It curates thematic morning and night songs matched to the user's calendar agenda and local weather conditions, then plays them at the configured alarm time.
+**AetherClock** is an AI-powered, retro-styled alarm clock web application. It curates thematic morning and night songs matched to the user's calendar agenda and local weather conditions, then plays them at the configured alarm time.
 
 The app is designed as a **single-page client-side application** built with React 19 and TypeScript, bundled with Vite. It can run both locally and inside **Google AI Studio** (evidenced by `metadata.json` and the `window.aistudio` API integration for API key management).
 
 Key capabilities:
-- Uses **Google GenAI** (`@google/genai`) to search for real-world songs via Google Search grounding, then generates a custom performance prompt.
-- Generates actual audio via the **`lyria-3-pro-preview`** music model, falling back to **`gemini-3.1-flash-tts-preview`** (TTS with `prebuiltVoiceConfig`) if music generation fails.
-- Offers a **YouTube embed primary** mode with a curated dictionary of embeddable video IDs per genre, plus a smart playlist system (1–5 tracks).
+- Uses **Google GenAI** (`@google/genai`) to search for real-world songs via Google Search grounding, then generates a custom performance prompt and lyrics.
+- **YouTube embed primary** playback with a curated pool of verified, royalty-free fallback tracks.
 - Generates a personalized **voice briefing** (time, weather, agenda) via Gemini TTS with selectable voices (`Fenrir`, `Kore`, `Leda`).
 - Fetches real-time weather from **Open-Meteo** (free, no API key required) using browser geolocation.
 - Supports **10 visual themes**, 3 of which feature full-screen animated **Babylon.js WebGL** backgrounds (Vaporwave, Space Odyssey, Sonar Marine).
@@ -51,8 +50,8 @@ Note: `@babylonjs/core` is listed in both `optimizeDeps.include` and `build.roll
 │   └── PWAInstallPrompt.tsx       # Banner prompting users to install the PWA
 ├── services/
 │   ├── weather.ts                 # Open-Meteo API client
-│   ├── genai.ts                   # Google GenAI integration (song search + Lyria generation)
-│   ├── playlist.ts                # YouTube fallback dictionary & playlist builder
+│   ├── genai.ts                   # Google GenAI integration (song search + prompt/lyrics)
+│   ├── playlist.ts                # YouTube fallback pool & playlist builder
 │   ├── voiceBriefing.ts           # TTS voice briefing generation
 │   ├── ttsPlayer.ts               # Simple HTMLAudioElement wrapper for base64 TTS playback
 │   ├── pwa.ts                     # Service worker registration, notifications, install prompts
@@ -83,20 +82,20 @@ Note: `@babylonjs/core` is listed in both `optimizeDeps.include` and `build.roll
 
 ## Build and Run Commands
 
-All commands use **npm**:
+All commands use **pnpm** (preferred):
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start development server (port 3000, host 0.0.0.0)
-npm run dev
+pnpm dev
 
 # Build for production
-npm run build
+pnpm build
 
 # Preview production build
-npm run preview
+pnpm preview
 ```
 
 ### Required Environment Variable
@@ -127,7 +126,7 @@ This is the heart of the application (~2000 lines). It manages:
 - Calendar/agenda dual-sync (structured interactive list ↔ raw textarea)
 - Genre station preset dial board
 - Settings drawer (theme, volume, loudness mode, pre-warm toggle, blacklist, LLM config, voice briefing config, playlist config, notifications, offline fallback, screen saver timeout)
-- Playback orchestration (voice briefing → playlist → YouTube iframe embed, or Lyria audio)
+- Playback orchestration (voice briefing → playlist → YouTube iframe embed)
 - Screen saver timer (activates after configurable idle seconds)
 - Real audio visualizer connection via `AudioContext` / `AnalyserNode`
 
@@ -154,16 +153,14 @@ Lazy-loads Babylon.js scene builders for the three premium WebGL themes (`vaporw
 Fetches current weather from Open-Meteo using latitude/longitude. Returns a fallback (20°C, clear) on failure.
 
 ### `services/genai.ts`
-Two-stage pipeline:
-1. **`generateMusicalPrompt`** — uses `gemini-3.5-flash` (or configured text model) with Google Search grounding to find a real song matching context (weather, agenda, time, genre). Returns structured JSON with song metadata, a musical prompt, and lyrics. Includes regex-based fallback parsing if JSON parse fails, and a hardcoded fallback song if the API call fails entirely.
-2. **`generateSong`** — streams audio from `lyria-3-pro-preview` with exponential backoff retry (up to 5 attempts). If that fails (e.g., permission denied), falls back to `gemini-3.1-flash-tts-preview` with `prebuiltVoiceConfig: { voiceName: 'Fenrir' }`.
-
-Both functions pass `User-Agent: 'lyria-radio-client'` in `httpOptions`.
+- **`generateMusicalPrompt`** — uses the configured text model (default `gemini-3.1-flash`) with Google Search grounding to find a real song matching context (weather, agenda, time, genre). Returns structured JSON with song metadata, a musical prompt, and lyrics. Validates that `youtubeVideoId` is an 11-character ID; if missing/invalid, retries once with a focused prompt. Includes regex-based fallback parsing if JSON parse fails, and a verified NCS fallback song if the API call fails entirely.
+- Both functions pass `User-Agent: 'aetherclock-client'` in `httpOptions`.
 
 ### `services/playlist.ts`
-- `REPUTABLE_YOUTUBE_FALLBACKS`: Curated embeddable video IDs per genre.
-- `generatePlaylist`: Fetches multiple tracks in parallel (capped at 3 to limit API calls), deduplicates by video ID, and pads with fallbacks if needed.
+- `RELIABLE_NCS_FALLBACKS`: Verified, royalty-free NoCopyrightSounds video IDs with metadata.
+- `generatePlaylist`: Fetches multiple tracks in parallel (capped at 3 to limit API calls), validates YouTube IDs, deduplicates, and pads with NCS fallbacks if needed. Every track carries a pre-built `embedUrl`.
 - `buildEmbedUrl`: Constructs YouTube iframe embed URLs with autoplay and modest branding.
+- `buildNcsChannelEmbedUrl`: Last-resort embed URL that loads the latest NCS channel uploads.
 
 ### `services/voiceBriefing.ts`
 Builds a short textual briefing from weather, agenda, and alarm time, then synthesizes it via Gemini TTS using the configured voice (`Fenrir`, `Kore`, or `Leda`). Returns base64 audio.
@@ -186,13 +183,12 @@ Key types:
 - `CalendarItem` — agenda event with `id`, `time`, `title`, `vibe`, `active`
 - `WeatherData` — temperature, WMO condition code, isDay flag
 - `MusicGenre` — union of 10 genres (`auto`, `synthwave`, `acoustic`, `lofi`, `rock`, `classical`, `jazz`, `pop`, `ambient`, `hiphop`)
-- `PlaybackSource` — `'youtube' | 'lyria'`
 - `SearchedSongMetadata` — title, artist, explanation, theme, style, optional YouTube ID
-- `PlaylistTrack` — title, artist, youtubeVideoId, whyExplanation
+- `PlaylistTrack` — title, artist, optional `youtubeVideoId`, `embedUrl`, `whyExplanation`
 - `PlaylistConfig` — enabled, trackCount, shuffle, crossfadeSeconds
 - `VoiceBriefingConfig` — enabled, voiceName, includeWeather, includeAgenda, includeTime, customGreeting
 - `LLMConfig` — textModel, ttsModel
-- `AppStatus` — `'idle' | 'generating_prompt' | 'generating_music' | 'generating_briefing' | 'ready' | 'playing_briefing' | 'playing' | 'error'`
+- `AppStatus` — `'idle' | 'generating_prompt' | 'generating_briefing' | 'ready' | 'playing_briefing' | 'playing' | 'error'`
 
 ---
 
@@ -205,8 +201,9 @@ Key types:
    - CSS custom properties (`--radio-case`, `--radio-lit`, `--body-bg`, etc.) are injected dynamically via `document.documentElement.style.setProperty` for theming.
    - Custom keyframe animations are injected via an inline `<style>` block inside `App.tsx`.
    - `index.css` is empty; do not add global styles there.
-4. **State Persistence**: User preferences are stored in `localStorage` with keys prefixed `lyria_`:
-   - `lyria_theme`, `lyria_volume`, `lyria_loudness`, `lyria_prewarm`, `lyria_blacklist`, `lyria_voice_briefing`, `lyria_playlist`, `lyria_llm`, `lyria_notifications`, `lyria_offline_fallback`, `lyria_screensaver_timeout`, `lyria_install_dismissed`.
+4. **State Persistence**: User preferences are stored in `localStorage` with keys prefixed `aetherclock_`:
+   - `aetherclock_theme`, `aetherclock_volume`, `aetherclock_loudness`, `aetherclock_prewarm`, `aetherclock_blacklist`, `aetherclock_voice_briefing`, `aetherclock_playlist`, `aetherclock_llm`, `aetherclock_notifications`, `aetherclock_offline_fallback`, `aetherclock_screensaver_timeout`, `aetherclock_install_dismissed`.
+   - A one-time migration copies legacy `lyria_*` keys to `aetherclock_*` on app load.
 5. **No Testing Framework**: There are no tests, test runners, or linting configurations in this project.
 6. **No Backend**: The app is entirely client-side. Weather is fetched from a free third-party API; AI calls go directly to Google's API.
 7. **TypeScript Config**: `tsconfig.json` sets `target: "ES2022"`, `experimentalDecorators: true`, and `useDefineForClassFields: false` to support Babylon.js decorators.
@@ -232,7 +229,13 @@ Key types:
 Browsers block autoplay. The app catches `audio.play()` rejection and displays a full-overlay button: **"Broadcast Muted (Click to Listen)"**. For YouTube mode, the iframe uses `autoplay=1` but may still require user interaction.
 
 ### YouTube Playback Mode
-When `playbackSource === 'youtube'`, the app skips Lyria generation and embeds a YouTube iframe using a grounded `youtubeVideoId` or a fallback ID from `REPUTABLE_YOUTUBE_FALLBACKS`. The app initializes the YouTube IFrame API player, listens for `onStateChange` to advance tracks, and destroys the player when switching away from YouTube mode.
+The app embeds a YouTube iframe using a grounded `youtubeVideoId` from the AI, or a verified NCS fallback ID if the AI fails to provide one. The app initializes the YouTube IFrame API player, listens for `onStateChange` to advance tracks, and retries with recovery IDs on player errors.
+
+### Fallback Strategy
+1. **Primary**: AI finds a real song + `youtubeVideoId` via Google Search grounding.
+2. **Secondary**: If the AI omits or returns an invalid ID, `generateMusicalPrompt` retries once with a focused ID-only prompt.
+3. **Tertiary**: `generatePlaylist` substitutes a verified NoCopyrightSounds fallback track with honest metadata.
+4. **Last resort**: `buildNcsChannelEmbedUrl` loads the latest NCS channel uploads so the alarm never stays silent.
 
 ### Offline Fallback
 If the device is offline at alarm time and offline fallback is enabled, the app bypasses all AI/YouTube logic and immediately plays a local alarm tone (`/assets/fallback-alarm.mp3`) or a synthesized Web Audio siren.
@@ -265,9 +268,10 @@ After a configurable idle timeout (default 30s), a screen saver overlay activate
 - **`index.css` is empty** — do not expect global styles there. Most styling is Tailwind + inline styles + CSS custom properties.
 - **App.tsx is ~2000 lines** — be cautious when editing; it is monolithic. Extracting logic into helper functions or custom hooks is often a good idea.
 - **The `process.env` references are Vite-injected** — they are not Node.js `process.env` at runtime; Vite replaces them statically at build time.
-- **Model names are hardcoded** in `services/genai.ts` and `services/voiceBriefing.ts` — changing them requires editing those files directly. However, `App.tsx` now allows users to select text and TTS models via `llmConfig`, which is persisted to `localStorage`.
+- **Model names are hardcoded** in `services/genai.ts` and `services/voiceBriefing.ts` — changing them requires editing those files directly. However, `App.tsx` allows users to select text and TTS models via `llmConfig`, which is persisted to `localStorage`.
 - **Weather codes come from WMO** — the `WEATHER_CODES` map in `types.ts` only covers a subset. Unknown codes display as "Clear".
 - **Babylon.js bundling** — `vite.config.ts` both optimizes and externalizes `@babylonjs/core`. Scene builders in `components/themes/scenes/` lazy-load via dynamic `import()`.
 - **Visualizer FFT** — Real FFT data only works for same-origin or CORS-enabled audio. YouTube cross-origin embeds cannot be connected to `AudioContext`, so the visualizer falls back to simulated genre-based animations during YouTube playback.
-- **YouTube IFrame API** — The player is initialized once and reused. Track changes call `loadVideoById`. Destroy the player when switching to Lyria mode to avoid conflicts.
+- **YouTube IFrame API** — The player is initialized once and reused. Track changes call `loadVideoById`. The player is destroyed on unmount.
 - **Playlist generation is capped at 3 tracks** internally to avoid excessive API calls during pre-warm, even if the user sets track count to 4 or 5.
+- **Fallbacks use NoCopyrightSounds (NCS)** — all hardcoded fallback IDs are from NCS because they are royalty-free and widely embeddable.

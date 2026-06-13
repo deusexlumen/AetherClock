@@ -1,6 +1,6 @@
 {
-  "name": "Lyria Radio Alarm Clock",
-  "short_name": "Lyria Radio",
+  "name": "AetherClock Radio Alarm",
+  "short_name": "AetherClock",
   "description": "AI-powered alarm clock with thematic playlists and voice briefing.",
   "start_url": "/",
   "display": "standalone",

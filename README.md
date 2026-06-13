@@ -173,19 +173,11 @@ All preferences are persisted in `localStorage` and survive reloads.
 | **Playlist** | On/Off, track count (1–5), shuffle, crossfade |
 | **Loudness** | Standard · Sunrise Progressive (gentle ramp) · Max Impact Shock |
 | **Pre-Warm Engine** | Generates content 60s before alarm time |
-| **Playback Source** | YouTube (fast) · Lyria AI (generates unique music, slower) |
+| **Playback Source** | YouTube (AI-curated real songs + verified NCS fallbacks) |
 | **Theme** | 10 visual presets |
 | **Blacklist** | Comma-separated artists/keywords to avoid |
 | **Notifications** | System push notifications on alarm trigger |
 | **Offline Fallback** | Local synthesized tone when disconnected |
-
----
-
-## 🧪 Experimental: Lyria Mode
-
-Switch the **Playback Source** from YouTube to **LYRIA** to trigger actual AI music generation via Google's Lyria model. If music generation fails, it gracefully falls back to Gemini TTS with instrumental styling.
-
-> ⚠️ Requires a Gemini API key with Lyria access enabled.
 
 ---
 

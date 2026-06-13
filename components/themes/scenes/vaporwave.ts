@@ -36,7 +36,7 @@ export function buildVaporwaveScene(engine: Engine, fftData?: Float32Array): Sce
   grid.material = gridMat;
 
   // Post-processing
-  const pipeline = new DefaultRenderingPipeline('post', true, scene, [camera]);
+  const pipeline = new DefaultRenderingPipeline('post', true, scene, [camera]) as any;
   pipeline.bloomEnabled = true;
   pipeline.bloomWeight = 1.5;
   pipeline.bloomThreshold = 0.6;

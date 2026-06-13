@@ -60,7 +60,7 @@ export const sendAlarmNotification = (title: string, body: string): void => {
       icon: '/icon.svg',
       requireInteraction: true,
       vibrate: [200, 100, 200, 100, 200]
-    });
+    } as any);
   }
 };
 

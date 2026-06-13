@@ -46,7 +46,7 @@ export const PlaylistViewer: React.FC<Props> = ({ playlist, currentIndex, onNext
       <div className="flex flex-col gap-0.5 max-h-[80px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-neutral-800">
         {playlist.map((track, idx) => (
           <div
-            key={`${track.youtubeVideoId}-${idx}`}
+            key={`${track.title}-${track.artist}-${idx}`}
             className={`flex items-center gap-2 px-2 py-1 rounded text-[9px] font-mono uppercase tracking-wider transition-all
               ${idx === currentIndex && !isPlayingBriefing
                 ? 'bg-radio-lit/10 border border-radio-lit/30 text-radio-lit'

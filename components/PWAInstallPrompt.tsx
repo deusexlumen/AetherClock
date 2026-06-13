@@ -7,14 +7,14 @@ export const PWAInstallPrompt: React.FC = () => {
 
   useEffect(() => {
     if (isStandalone()) return;
-    const dismissedRaw = localStorage.getItem('lyria_install_dismissed');
+    const dismissedRaw = localStorage.getItem('aetherclock_install_dismissed');
     if (dismissedRaw) {
       const dismissedAt = parseInt(dismissedRaw, 10);
       const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
       if (!Number.isNaN(dismissedAt) && Date.now() - dismissedAt < SEVEN_DAYS) {
         return;
       }
-      localStorage.removeItem('lyria_install_dismissed');
+      localStorage.removeItem('aetherclock_install_dismissed');
     }
 
     const checkPrompt = () => {
@@ -56,7 +56,7 @@ export const PWAInstallPrompt: React.FC = () => {
   };
 
   const handleDismiss = () => {
-    localStorage.setItem('lyria_install_dismissed', String(Date.now()));
+    localStorage.setItem('aetherclock_install_dismissed', String(Date.now()));
     setVisible(false);
     clearDeferredPrompt();
   };

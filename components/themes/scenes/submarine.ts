@@ -65,7 +65,7 @@ export function buildSubmarineScene(engine: Engine, fftData?: Float32Array): Sce
   pingRing.scaling.setAll(0.1);
 
   // Post-processing
-  const pipeline = new DefaultRenderingPipeline('post', true, scene, [camera]);
+  const pipeline = new DefaultRenderingPipeline('post', true, scene, [camera]) as any;
   pipeline.bloomEnabled = true;
   pipeline.bloomWeight = 1.0;
   pipeline.bloomThreshold = 0.4;

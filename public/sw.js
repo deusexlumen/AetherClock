@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lyria-radio-v2';
+const CACHE_NAME = 'aetherclock-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -53,11 +53,11 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   const data = event.data?.json() || {};
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Lyria Radio', {
+    self.registration.showNotification(data.title || 'AetherClock', {
       body: data.body || 'Wake up! Your alarm is ringing.',
       icon: '/icon.svg',
       badge: '/icon.svg',
-      tag: 'lyria-alarm',
+      tag: 'aetherclock-alarm',
       requireInteraction: true,
       vibrate: [200, 100, 200, 100, 200],
       data: { url: data.url || '/' }

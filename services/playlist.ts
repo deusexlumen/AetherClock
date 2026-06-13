@@ -1,29 +1,26 @@
 // BUXE_OS v24.X -- PLAYLIST SERVICE
 import { MusicGenre, PlaylistTrack, SearchedSongMetadata } from '../types';
 
-// Garantiert embeddable Fallback-Videos (keine Livestreams — echte Musikvideos)
-export const REPUTABLE_YOUTUBE_FALLBACKS: Record<MusicGenre, string[]> = {
-  auto: ['kJQP7kiw5Fk', 'RgKAFK5djSk', 'JGwWNGJdvx8'],
-  synthwave: ['4NRXx6U8ABQ', 'JGwWNGJdvx8', 'kJQP7kiw5Fk'],
-  acoustic: ['JGwWNGJdvx8', 'RgKAFK5djSk', 'CevxZvSJLk8'],
-  lofi: ['JGwWNGJdvx8', 'RgKAFK5djSk', 'kJQP7kiw5Fk'],
-  rock: ['btPJPFnesV4', 'eVTXPUF4Oz4', 'CevxZvSJLk8'],
-  classical: ['RgKAFK5djSk', 'JGwWNGJdvx8', 'kJQP7kiw5Fk'],
-  jazz: ['RgKAFK5djSk', 'kJQP7kiw5Fk', 'JGwWNGJdvx8'],
-  pop: ['kJQP7kiw5Fk', 'CevxZvSJLk8', 'JGwWNGJdvx8'],
-  ambient: ['RgKAFK5djSk', 'JGwWNGJdvx8', 'kJQP7kiw5Fk'],
-  hiphop: ['RgKAFK5djSk', 'kJQP7kiw5Fk', 'JGwWNGJdvx8'],
+// Verified NoCopyrightSounds fallback tracks. NCS releases are royalty-free and
+// generally embeddable worldwide, making them a safe safety net when the AI
+// cannot provide a working youtubeVideoId.
+export const RELIABLE_NCS_FALLBACKS: Record<string, { title: string; artist: string; whyExplanation: string }> = {
+  'K4DyBUG242c': { title: 'On & On', artist: 'Cartoon feat. Daniel Levi', whyExplanation: 'Energetic NCS fallback tuned to your station preset.' },
+  'TW9d8vYrVFQ': { title: 'Sky High', artist: 'Elektronomia', whyExplanation: 'Uplifting NCS fallback tuned to your station preset.' },
+  'J2X5mJ3HDYE': { title: 'Invincible', artist: 'DEAF KEV', whyExplanation: 'Driving NCS fallback tuned to your station preset.' },
+  '3nQNiWdeH2Q': { title: 'Heroes Tonight', artist: 'Janji feat. Johnning', whyExplanation: 'Motivational NCS fallback tuned to your station preset.' },
+  'p7ZsBPK656s': { title: 'Blank', artist: 'Disfigure', whyExplanation: 'Melodic NCS fallback tuned to your station preset.' },
+  'S19UcWdOA-I': { title: 'Fearless pt.II', artist: 'TULE feat. Chris Linton', whyExplanation: 'Epic NCS fallback tuned to your station preset.' },
+  'yJg-Y5byMMw': { title: 'Mortals', artist: 'Warriyo feat. Laura Brehm', whyExplanation: 'Powerful NCS fallback tuned to your station preset.' },
 };
 
-// Fallback-Metadaten für bekannte IDs, damit der Name im UI stimmt
-export const FALLBACK_TRACK_INFO: Record<string, { title: string; artist: string; whyExplanation: string }> = {
-  'kJQP7kiw5Fk': { title: 'Despacito', artist: 'Luis Fonsi', whyExplanation: 'Pop-energy fallback tuned to your station preset.' },
-  'RgKAFK5djSk': { title: 'See You Again', artist: 'Wiz Khalifa', whyExplanation: 'Melodic fallback tuned to your station preset.' },
-  'JGwWNGJdvx8': { title: 'Shape of You', artist: 'Ed Sheeran', whyExplanation: 'Chill-rhythm fallback tuned to your station preset.' },
-  'btPJPFnesV4': { title: 'Eye of the Tiger', artist: 'Survivor', whyExplanation: 'High-energy rock fallback tuned to your station preset.' },
-  'eVTXPUF4Oz4': { title: 'In The End', artist: 'Linkin Park', whyExplanation: 'Alt-rock fallback tuned to your station preset.' },
-  'CevxZvSJLk8': { title: 'Roar', artist: 'Katy Perry', whyExplanation: 'Pop-anthem fallback tuned to your station preset.' },
-  '4NRXx6U8ABQ': { title: 'Blinding Lights', artist: 'The Weeknd', whyExplanation: 'Synthwave fallback tuned to your station preset.' },
+const NCS_FALLBACK_IDS = Object.keys(RELIABLE_NCS_FALLBACKS);
+const NCS_CHANNEL_ID = 'UC_aEa8K-EOJ3D6gOs7HcyNg';
+
+const YOUTUBE_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
+
+export const isValidVideoId = (id: string | null | undefined): id is string => {
+  return typeof id === 'string' && YOUTUBE_ID_REGEX.test(id.trim());
 };
 
 export const buildEmbedUrl = (videoId: string | null | undefined): string | null => {
@@ -32,15 +29,30 @@ export const buildEmbedUrl = (videoId: string | null | undefined): string | null
   return `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&modestbranding=1&playlist=${id}&loop=1&enablejsapi=1`;
 };
 
-export const getFallbackVideoId = (genre: MusicGenre): string => {
-  const list = REPUTABLE_YOUTUBE_FALLBACKS[genre] || REPUTABLE_YOUTUBE_FALLBACKS.auto;
-  return list[Math.floor(Math.random() * list.length)];
+export const buildNcsChannelEmbedUrl = (): string => {
+  return `https://www.youtube.com/embed?listType=user_uploads&list=${NCS_CHANNEL_ID}&autoplay=1&controls=0&modestbranding=1&enablejsapi=1`;
+};
+
+export const getFallbackTrack = (usedIds: Set<string>): PlaylistTrack => {
+  const availableIds = NCS_FALLBACK_IDS.filter((id) => !usedIds.has(id));
+  const pool = availableIds.length > 0 ? availableIds : NCS_FALLBACK_IDS;
+  const videoId = pool[Math.floor(Math.random() * pool.length)];
+  const info = RELIABLE_NCS_FALLBACKS[videoId];
+  usedIds.add(videoId);
+
+  return {
+    title: info?.title || 'AetherClock Radio',
+    artist: info?.artist || 'NoCopyrightSounds',
+    youtubeVideoId: videoId,
+    embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
+    whyExplanation: info?.whyExplanation || 'Emergency fallback signal tuned to your station preset.',
+  };
 };
 
 export const generatePlaylist = async (
   fetchTrackFn: () => Promise<SearchedSongMetadata>,
   trackCount: number,
-  genre: MusicGenre = 'auto'
+  _genre: MusicGenre = 'auto'
 ): Promise<PlaylistTrack[]> => {
   const tracks: PlaylistTrack[] = [];
   const usedIds = new Set<string>();
@@ -58,50 +70,49 @@ export const generatePlaylist = async (
   const results = await Promise.all(promises);
 
   for (const meta of results) {
-    if (!meta) continue;
-    let videoId = meta.youtubeVideoId?.trim();
-
-    // Wenn die KI kein Video-ID liefert, weise ein passendes Fallback-Video zu
-    // aber behalte die kuratierten Metadaten bei
-    if (!videoId) {
-      let attempts = 0;
-      do {
-        videoId = getFallbackVideoId(genre);
-        attempts++;
-      } while (usedIds.has(videoId) && attempts < 10);
+    if (!meta) {
+      tracks.push(getFallbackTrack(usedIds));
+      continue;
     }
 
-    if (!videoId) continue;
-    if (usedIds.has(videoId)) continue;
-    usedIds.add(videoId);
+    const videoId = meta.youtubeVideoId?.trim();
 
-    // Falls es ein bekannter Fallback ist, zeige den echten Songnamen an
-    const fallbackInfo = FALLBACK_TRACK_INFO[videoId];
-
-    tracks.push({
-      title: meta.title || fallbackInfo?.title || 'Radio Broadcast',
-      artist: meta.artist || fallbackInfo?.artist || 'AetherClock Radio',
-      youtubeVideoId: videoId,
-      whyExplanation: meta.whyExplanation || fallbackInfo?.whyExplanation || 'Emergency fallback signal tuned to your station preset.',
-    });
-  }
-
-  // Mit Fallbacks auffuellen, damit der Alarm nie stumm bleibt
-  while (tracks.length < safeTrackCount) {
-    const fallbackId = getFallbackVideoId(genre);
-    if (!usedIds.has(fallbackId)) {
-      usedIds.add(fallbackId);
-      const info = FALLBACK_TRACK_INFO[fallbackId];
+    if (isValidVideoId(videoId) && !usedIds.has(videoId)) {
+      usedIds.add(videoId);
       tracks.push({
-        title: info?.title || 'Radio Broadcast',
-        artist: info?.artist || 'AetherClock Radio',
-        youtubeVideoId: fallbackId,
-        whyExplanation: info?.whyExplanation || 'Emergency fallback signal tuned to your station preset.',
+        title: meta.title || 'AetherClock Radio',
+        artist: meta.artist || 'Unknown Artist',
+        youtubeVideoId: videoId,
+        embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
+        whyExplanation: meta.whyExplanation || 'Curated by AetherClock AI.',
       });
     } else {
-      // Wenn alle Fallbacks schon verbraucht sind, abbrechen um Endlosschleife zu vermeiden
-      break;
+      // The AI did not return a usable video ID. Use a reliable fallback so the
+      // alarm never stays silent, but keep the AI's explanation if it helps.
+      const fallback = getFallbackTrack(usedIds);
+      tracks.push({
+        ...fallback,
+        whyExplanation: meta.whyExplanation
+          ? `${meta.whyExplanation} (fallback player)`
+          : fallback.whyExplanation,
+      });
     }
+  }
+
+  // Pad with fallbacks until we have the requested number of tracks.
+  while (tracks.length < safeTrackCount) {
+    tracks.push(getFallbackTrack(usedIds));
+  }
+
+  // Ultimate safety net: if somehow no tracks were produced, return the NCS
+  // channel uploads player so YouTube serves any available NCS upload.
+  if (tracks.length === 0) {
+    tracks.push({
+      title: 'AetherClock Safety Net',
+      artist: 'NoCopyrightSounds',
+      embedUrl: buildNcsChannelEmbedUrl(),
+      whyExplanation: 'Emergency channel fallback — playing the latest NCS uploads.',
+    });
   }
 
   return tracks;

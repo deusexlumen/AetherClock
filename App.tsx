@@ -17,7 +17,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
-import { generatePlaylist, buildEmbedUrl, getNextTrackIndex, REPUTABLE_YOUTUBE_FALLBACKS } from './services/playlist';
+import { generatePlaylist, getNextTrackIndex, buildEmbedUrl, buildNcsChannelEmbedUrl } from './services/playlist';
 import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
   Power, 
@@ -110,6 +110,38 @@ export const formatCalendarToAgenda = (calendar: CalendarItem[]): string => {
     .map(item => `${item.time.replace(':', '')} ${item.title}`)
     .join('\n');
 };
+
+// One-time migration of legacy Lyria localStorage keys to AetherClock keys.
+// Runs at module load so state initializers read the migrated values.
+(() => {
+  const legacyKeys = [
+    'lyria_theme',
+    'lyria_volume',
+    'lyria_loudness',
+    'lyria_blacklist',
+    'lyria_prewarm',
+    'lyria_voice_briefing',
+    'lyria_playlist',
+    'lyria_llm',
+    'lyria_notifications',
+    'lyria_offline_fallback',
+    'lyria_screensaver_timeout',
+  ];
+  for (const oldKey of legacyKeys) {
+    try {
+      const value = localStorage.getItem(oldKey);
+      if (value !== null) {
+        const newKey = oldKey.replace('lyria_', 'aetherclock_');
+        if (localStorage.getItem(newKey) === null) {
+          localStorage.setItem(newKey, value);
+        }
+        localStorage.removeItem(oldKey);
+      }
+    } catch (e) {
+      // Ignore storage errors (e.g., private mode)
+    }
+  }
+})();
 
 const THEMES = {
   obsidian: {
@@ -249,7 +281,7 @@ const getPreAlarmTime = (alarmTimeStr: string): string => {
   let hr = parseInt(hrStr, 10);
   let min = parseInt(minStr, 10);
   
-  min = min - 2; // Pre-warm 2 minutes before to account for generation + validation time
+  min = min - 1; // Pre-warm 1 minute before to account for generation + validation time
   if (min < 0) {
     min = 60 + min;
     hr = hr - 1;
@@ -287,28 +319,28 @@ const App: React.FC = () => {
   // Settings and Customize State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<'obsidian' | 'amber' | 'cobalt' | 'ivory' | 'vaporwave' | 'antique' | 'toxic' | 'space' | 'royal' | 'submarine'>(() => {
-    return (localStorage.getItem('lyria_theme') as any) || 'obsidian';
+    return (localStorage.getItem('aetherclock_theme') as any) || 'obsidian';
   });
   const [volume, setVolume] = useState<number>(() => {
-    const saved = localStorage.getItem('lyria_volume');
+    const saved = localStorage.getItem('aetherclock_volume');
     const parsed = saved !== null ? parseInt(saved, 10) : 75;
     return Number.isNaN(parsed) ? 75 : Math.max(0, Math.min(100, parsed));
   });
   const [loudnessMode, setLoudnessMode] = useState<'standard' | 'sunrise_progressive' | 'max_impact'>(() => {
-    return (localStorage.getItem('lyria_loudness') as any) || 'standard';
+    return (localStorage.getItem('aetherclock_loudness') as any) || 'standard';
   });
   const [blacklist, setBlacklist] = useState<string>(() => {
-    return localStorage.getItem('lyria_blacklist') || '';
+    return localStorage.getItem('aetherclock_blacklist') || '';
   });
   const [isPreWarmEnabled, setIsPreWarmEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem('lyria_prewarm');
+    const saved = localStorage.getItem('aetherclock_prewarm');
     return saved !== null ? saved === 'true' : true;
   });
   const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
 
   const [voiceBriefingConfig, setVoiceBriefingConfig] = useState<VoiceBriefingConfig>(() => {
     try {
-      const saved = localStorage.getItem('lyria_voice_briefing');
+      const saved = localStorage.getItem('aetherclock_voice_briefing');
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
@@ -323,7 +355,7 @@ const App: React.FC = () => {
 
   const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfig>(() => {
     try {
-      const saved = localStorage.getItem('lyria_playlist');
+      const saved = localStorage.getItem('aetherclock_playlist');
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
@@ -336,7 +368,7 @@ const App: React.FC = () => {
 
   const [llmConfig, setLLMConfig] = useState<LLMConfig>(() => {
     try {
-      const saved = localStorage.getItem('lyria_llm');
+      const saved = localStorage.getItem('aetherclock_llm');
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
@@ -346,17 +378,17 @@ const App: React.FC = () => {
   });
 
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('lyria_notifications') === 'true';
+    return localStorage.getItem('aetherclock_notifications') === 'true';
   });
   const [offlineFallbackEnabled, setOfflineFallbackEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem('lyria_offline_fallback');
+    const saved = localStorage.getItem('aetherclock_offline_fallback');
     return saved !== null ? saved === 'true' : true;
   });
   const [isOnlineStatus, setIsOnlineStatus] = useState<boolean>(true);
   const [isAppInstalled, setIsAppInstalled] = useState<boolean>(false);
   const [isScreenSaverActive, setIsScreenSaverActive] = useState<boolean>(false);
   const [screenSaverTimeout, setScreenSaverTimeout] = useState<number>(() => {
-    const saved = localStorage.getItem('lyria_screensaver_timeout');
+    const saved = localStorage.getItem('aetherclock_screensaver_timeout');
     const parsed = saved !== null ? parseInt(saved, 10) : 30;
     return Number.isNaN(parsed) ? 30 : Math.max(5, parsed);
   });
@@ -405,8 +437,9 @@ const App: React.FC = () => {
   const errorRecoveryIndexRef = useRef<number>(0);
 
   const getRecoveryVideoId = (index: number): string | null => {
-    const playlistIds = state.playlist.map(t => t.youtubeVideoId).filter(Boolean);
-    const emergencyIds = Object.values(REPUTABLE_YOUTUBE_FALLBACKS).flat();
+    const playlistIds = state.playlist.map(t => t.youtubeVideoId).filter(Boolean) as string[];
+    // Verified NCS fallback IDs; these are royalty-free and embeddable.
+    const emergencyIds = ['K4DyBUG242c', 'TW9d8vYrVFQ', 'J2X5mJ3HDYE', '3nQNiWdeH2Q', 'p7ZsBPK656s', 'S19UcWdOA-I', 'yJg-Y5byMMw'];
     const allIds = [...new Set([...playlistIds, ...emergencyIds])];
     if (allIds.length === 0) return null;
     return allIds[index % allIds.length];
@@ -710,10 +743,12 @@ const App: React.FC = () => {
       } else {
         // Single track mode
         if (resultData.searchedSong.youtubeVideoId) {
+          const videoId = resultData.searchedSong.youtubeVideoId;
           playlist = [{
             title: resultData.searchedSong.title,
             artist: resultData.searchedSong.artist,
-            youtubeVideoId: resultData.searchedSong.youtubeVideoId,
+            youtubeVideoId: videoId,
+            embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
             whyExplanation: resultData.searchedSong.whyExplanation
           }];
         }
@@ -735,7 +770,7 @@ const App: React.FC = () => {
         }
       }
 
-      const embedUrl = playlist[0]?.youtubeVideoId ? buildEmbedUrl(playlist[0].youtubeVideoId) : null;
+      const embedUrl = playlist[0]?.embedUrl || null;
 
       if (preGenerateOnly) {
         setState(prev => ({
@@ -777,7 +812,7 @@ const App: React.FC = () => {
           ...prev,
           status: 'playing',
           currentTrackIndex: 0,
-          youtubeEmbedUrl: prev.playlist[0]?.youtubeVideoId ? buildEmbedUrl(prev.playlist[0].youtubeVideoId) : null
+          youtubeEmbedUrl: prev.playlist[0]?.embedUrl || null
         }));
       });
     } else {
@@ -785,7 +820,7 @@ const App: React.FC = () => {
         ...prev,
         status: 'playing',
         currentTrackIndex: 0,
-        youtubeEmbedUrl: prev.playlist[0]?.youtubeVideoId ? buildEmbedUrl(prev.playlist[0].youtubeVideoId) : null
+        youtubeEmbedUrl: prev.playlist[0]?.embedUrl || null
       }));
     }
   };
@@ -795,8 +830,9 @@ const App: React.FC = () => {
     errorRecoveryIndexRef.current = 0;
     if (state.playlist.length === 0) return;
     if (state.playlist.length === 1) {
-      if (youtubePlayerRef.current?.loadVideoById) {
-        youtubePlayerRef.current.loadVideoById(state.playlist[0].youtubeVideoId);
+      const videoId = state.playlist[0].youtubeVideoId;
+      if (videoId && youtubePlayerRef.current?.loadVideoById) {
+        youtubePlayerRef.current.loadVideoById(videoId);
       }
       return;
     }
@@ -806,7 +842,7 @@ const App: React.FC = () => {
     setState(prev => ({
       ...prev,
       currentTrackIndex: nextIndex,
-      youtubeEmbedUrl: buildEmbedUrl(prev.playlist[nextIndex].youtubeVideoId)
+      youtubeEmbedUrl: prev.playlist[nextIndex].embedUrl || null
     }));
   }, [state.playlist.length, state.currentTrackIndex, playlistConfig.shuffle]);
 
@@ -817,7 +853,7 @@ const App: React.FC = () => {
     setState(prev => ({
       ...prev,
       currentTrackIndex: prevIndex,
-      youtubeEmbedUrl: buildEmbedUrl(prev.playlist[prevIndex].youtubeVideoId)
+      youtubeEmbedUrl: prev.playlist[prevIndex].embedUrl || null
     }));
   }, [state.playlist.length, state.currentTrackIndex]);
 
@@ -839,6 +875,11 @@ const App: React.FC = () => {
 
     const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId
       || state.searchedTrack?.youtubeVideoId;
+
+    if (!videoId) {
+      console.warn('[YT] No videoId available for player initialization');
+      return;
+    }
 
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -904,6 +945,11 @@ const App: React.FC = () => {
 
     const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId
       || state.searchedTrack?.youtubeVideoId;
+
+    if (!videoId) {
+      console.warn('[YT] No videoId available for track change');
+      return;
+    }
 
     youtubePlayerRef.current.loadVideoById(videoId);
   }, [state.currentTrackIndex]);
@@ -1176,7 +1222,7 @@ const App: React.FC = () => {
                                      type="button"
                                      onClick={() => {
                                          setCurrentTheme(key as any);
-                                         localStorage.setItem('lyria_theme', key);
+                                         localStorage.setItem('aetherclock_theme', key);
                                      }}
                                      className={`p-1.5 rounded font-mono text-[8px] sm:text-[9px] font-bold uppercase border tracking-wider transition-all duration-100 text-center
                                          ${currentTheme === key
@@ -1207,7 +1253,7 @@ const App: React.FC = () => {
                                  onChange={(e) => {
                                      const v = parseInt(e.target.value, 10);
                                      setVolume(v);
-                                     localStorage.setItem('lyria_volume', String(v));
+                                     localStorage.setItem('aetherclock_volume', String(v));
                                  }}
                                  className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
                              />
@@ -1221,7 +1267,7 @@ const App: React.FC = () => {
                                  onChange={(e) => {
                                      const mode = e.target.value as any;
                                      setLoudnessMode(mode);
-                                     localStorage.setItem('lyria_loudness', mode);
+                                     localStorage.setItem('aetherclock_loudness', mode);
                                  }}
                                  className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
                              >
@@ -1243,7 +1289,7 @@ const App: React.FC = () => {
                                      onChange={(e) => {
                                          const enabled = e.target.checked;
                                          setIsPreWarmEnabled(enabled);
-                                         localStorage.setItem('lyria_prewarm', String(enabled));
+                                         localStorage.setItem('aetherclock_prewarm', String(enabled));
                                      }}
                                      className="w-3.5 h-3.5 rounded border-neutral-700 text-radio-lit bg-neutral-900 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-radio-lit"
                                  />
@@ -1267,7 +1313,7 @@ const App: React.FC = () => {
                                  value={blacklist}
                                  onChange={(e) => {
                                      setBlacklist(e.target.value);
-                                     localStorage.setItem('lyria_blacklist', e.target.value);
+                                     localStorage.setItem('aetherclock_blacklist', e.target.value);
                                  }}
                                  className="w-full bg-neutral-850 border border-white/5 rounded px-2.5 py-1 text-[9px] font-mono uppercase text-amber-300 placeholder-yellow-800/20 outline-none focus:border-radio-lit"
                              />
@@ -1285,7 +1331,7 @@ const App: React.FC = () => {
                                  onChange={(e) => {
                                      const next = { ...voiceBriefingConfig, enabled: e.target.checked };
                                      setVoiceBriefingConfig(next);
-                                     localStorage.setItem('lyria_voice_briefing', JSON.stringify(next));
+                                     localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next));
                                  }}
                                  className="ml-auto w-3.5 h-3.5 rounded border-neutral-700 text-radio-lit bg-neutral-900 accent-radio-lit cursor-pointer"
                              />
@@ -1297,7 +1343,7 @@ const App: React.FC = () => {
                                      onChange={(e) => {
                                          const next = { ...voiceBriefingConfig, voiceName: e.target.value as any };
                                          setVoiceBriefingConfig(next);
-                                         localStorage.setItem('lyria_voice_briefing', JSON.stringify(next));
+                                         localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next));
                                      }}
                                      className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
                                  >
@@ -1312,18 +1358,18 @@ const App: React.FC = () => {
                                      onChange={(e) => {
                                          const next = { ...voiceBriefingConfig, customGreeting: e.target.value };
                                          setVoiceBriefingConfig(next);
-                                         localStorage.setItem('lyria_voice_briefing', JSON.stringify(next));
+                                         localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next));
                                      }}
                                      className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono text-amber-300 placeholder-yellow-800/20 outline-none focus:border-radio-lit"
                                  />
                                  <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
-                                     <input type="checkbox" checked={voiceBriefingConfig.includeWeather} onChange={(e) => { const next = { ...voiceBriefingConfig, includeWeather: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('lyria_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Weather
+                                     <input type="checkbox" checked={voiceBriefingConfig.includeWeather} onChange={(e) => { const next = { ...voiceBriefingConfig, includeWeather: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Weather
                                  </label>
                                  <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
-                                     <input type="checkbox" checked={voiceBriefingConfig.includeAgenda} onChange={(e) => { const next = { ...voiceBriefingConfig, includeAgenda: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('lyria_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Agenda
+                                     <input type="checkbox" checked={voiceBriefingConfig.includeAgenda} onChange={(e) => { const next = { ...voiceBriefingConfig, includeAgenda: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Agenda
                                  </label>
                                  <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
-                                     <input type="checkbox" checked={voiceBriefingConfig.includeTime} onChange={(e) => { const next = { ...voiceBriefingConfig, includeTime: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('lyria_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Time
+                                     <input type="checkbox" checked={voiceBriefingConfig.includeTime} onChange={(e) => { const next = { ...voiceBriefingConfig, includeTime: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Time
                                  </label>
                              </div>
                          )}
@@ -1340,7 +1386,7 @@ const App: React.FC = () => {
                                  onChange={(e) => {
                                      const next = { ...playlistConfig, enabled: e.target.checked };
                                      setPlaylistConfig(next);
-                                     localStorage.setItem('lyria_playlist', JSON.stringify(next));
+                                     localStorage.setItem('aetherclock_playlist', JSON.stringify(next));
                                  }}
                                  className="ml-auto w-3.5 h-3.5 rounded border-neutral-700 text-radio-lit bg-neutral-900 accent-radio-lit cursor-pointer"
                              />
@@ -1355,14 +1401,14 @@ const App: React.FC = () => {
                                          onChange={(e) => {
                                              const next = { ...playlistConfig, trackCount: parseInt(e.target.value) };
                                              setPlaylistConfig(next);
-                                             localStorage.setItem('lyria_playlist', JSON.stringify(next));
+                                             localStorage.setItem('aetherclock_playlist', JSON.stringify(next));
                                          }}
                                          className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
                                      />
                                  </div>
 
                                  <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
-                                     <input type="checkbox" checked={playlistConfig.shuffle} onChange={(e) => { const next = { ...playlistConfig, shuffle: e.target.checked }; setPlaylistConfig(next); localStorage.setItem('lyria_playlist', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Shuffle
+                                     <input type="checkbox" checked={playlistConfig.shuffle} onChange={(e) => { const next = { ...playlistConfig, shuffle: e.target.checked }; setPlaylistConfig(next); localStorage.setItem('aetherclock_playlist', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Shuffle
                                  </label>
                              </div>
                          )}
@@ -1382,7 +1428,7 @@ const App: React.FC = () => {
                                      onChange={(e) => {
                                          const next = { ...llmConfig, textModel: e.target.value as any };
                                          setLLMConfig(next);
-                                         localStorage.setItem('lyria_llm', JSON.stringify(next));
+                                         localStorage.setItem('aetherclock_llm', JSON.stringify(next));
                                      }}
                                      className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
                                  >
@@ -1401,7 +1447,7 @@ const App: React.FC = () => {
                                      onChange={(e) => {
                                          const next = { ...llmConfig, ttsModel: e.target.value as any };
                                          setLLMConfig(next);
-                                         localStorage.setItem('lyria_llm', JSON.stringify(next));
+                                         localStorage.setItem('aetherclock_llm', JSON.stringify(next));
                                      }}
                                      className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
                                  >
@@ -1432,10 +1478,10 @@ const App: React.FC = () => {
                                                  if (enabled) {
                                                      const granted = await requestNotificationPermission();
                                                      setNotificationsEnabled(granted);
-                                                     localStorage.setItem('lyria_notifications', String(granted));
+                                                     localStorage.setItem('aetherclock_notifications', String(granted));
                                                  } else {
                                                      setNotificationsEnabled(false);
-                                                     localStorage.setItem('lyria_notifications', 'false');
+                                                     localStorage.setItem('aetherclock_notifications', 'false');
                                                  }
                                              }}
                                              className="w-3 h-3 accent-radio-lit cursor-pointer"
@@ -1456,7 +1502,7 @@ const App: React.FC = () => {
                                          onChange={(e) => {
                                              const val = parseInt(e.target.value);
                                              setScreenSaverTimeout(val);
-                                             localStorage.setItem('lyria_screensaver_timeout', String(val));
+                                             localStorage.setItem('aetherclock_screensaver_timeout', String(val));
                                          }}
                                          className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
                                      />
@@ -1472,7 +1518,7 @@ const App: React.FC = () => {
                                              onChange={(e) => {
                                                  const enabled = e.target.checked;
                                                  setOfflineFallbackEnabled(enabled);
-                                                 localStorage.setItem('lyria_offline_fallback', String(enabled));
+                                                 localStorage.setItem('aetherclock_offline_fallback', String(enabled));
                                              }}
                                              className="w-3 h-3 accent-radio-lit cursor-pointer"
                                          />

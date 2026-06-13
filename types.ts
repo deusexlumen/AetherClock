@@ -26,7 +26,8 @@ export interface SearchedSongMetadata {
 export interface PlaylistTrack {
   title: string;
   artist: string;
-  youtubeVideoId: string;
+  youtubeVideoId?: string;
+  embedUrl: string;
   whyExplanation: string;
 }
 

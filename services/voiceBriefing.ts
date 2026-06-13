@@ -19,7 +19,7 @@ export const generateVoiceBriefing = async (
   const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
     httpOptions: {
-      headers: { 'User-Agent': 'lyria-radio-client' }
+      headers: { 'User-Agent': 'aetherclock-client' }
     }
   });
 
