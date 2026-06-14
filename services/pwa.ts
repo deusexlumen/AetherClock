@@ -1,3 +1,5 @@
+import { ALARM_NOTIFICATION_OPTIONS } from './notificationConfig';
+
 export interface PWAState {
   isInstalled: boolean;
   installPrompt: Event | null;
@@ -14,12 +16,25 @@ let deferredPrompt: InstallPromptEvent | null = null;
 export const registerServiceWorker = async (): Promise<void> => {
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
+      const registration = await navigator.serviceWorker.register('/sw.js', { type: 'module' });
       console.log('[PWA] Service Worker registered:', registration.scope);
     } catch (err) {
       console.warn('[PWA] Service Worker registration failed:', err);
     }
   }
+};
+
+export const notifyServiceWorkerDeviceId = (deviceId: string): void => {
+  if (!('serviceWorker' in navigator)) return;
+  const send = (controller: ServiceWorker) => {
+    controller.postMessage({ type: 'SET_DEVICE_ID', deviceId });
+  };
+  if (navigator.serviceWorker.controller) {
+    send(navigator.serviceWorker.controller);
+  }
+  navigator.serviceWorker.ready.then((registration) => {
+    if (registration.active) send(registration.active);
+  });
 };
 
 export const captureInstallPrompt = (event: Event): void => {
@@ -52,21 +67,20 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   return result === 'granted';
 };
 
-export const sendAlarmNotification = (title: string, body: string): void => {
+export const sendAlarmNotification = (title: string, body: string, url = window.location.href): void => {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: 'SHOW_NOTIFICATION',
       title,
       body,
-      url: window.location.href
+      url,
     });
   } else {
-    const options: NotificationOptions & { vibrate?: number[] } = {
+    const options: NotificationOptions & { vibrate?: number[]; tag?: string } = {
       body,
-      icon: '/icon.svg',
-      requireInteraction: true,
-      vibrate: [200, 100, 200, 100, 200]
+      ...ALARM_NOTIFICATION_OPTIONS,
+      data: { url },
     };
     new Notification(title, options);
   }
