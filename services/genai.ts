@@ -122,6 +122,25 @@ const parseResult = (bodyText: string, genrePreset: MusicGenre, alarmTime: strin
   }
 };
 
+const buildFallbackResult = (genrePreset: MusicGenre, alarmTime: string, weather: WeatherData | null): MusicalPromptResult => {
+  const weatherDesc = weather
+    ? `${weather.temperature}°C with ${WEATHER_CODES[weather.conditionCode] || 'clear skies'}`
+    : "mild weather";
+
+  return {
+    searchedSong: {
+      title: "On & On",
+      artist: "Cartoon feat. Daniel Levi",
+      youtubeVideoId: FALLBACK_VIDEO_ID,
+      whyExplanation: "AetherClock safety-net track to lift spirits regardless of weather.",
+      foundTheme: "Inspirational",
+      styleDescription: "Energetic electronic pop with positive vocal delivery"
+    },
+    musicalPrompt: "An energetic electronic pop song with bright synths, driving beat, and positive vocals.",
+    lyrics: "When I wake up in the morning, Lord\nAnd the sunlight hurts my eyes\nAnd something without warning, Lord\nBears heavy on my mind\nThen I look at you, and the world's alright with me."
+  };
+};
+
 /**
  * Search for an appropriate real track using Google Search grounding based on
  * current context (weather, locations, appointments, time), then generate an alarm prompt.
@@ -136,8 +155,14 @@ export const generateMusicalPrompt = async (
   blacklist?: string,
   config?: LLMConfig
 ): Promise<MusicalPromptResult> => {
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.warn('[generateMusicalPrompt] No GEMINI_API_KEY configured; using fallback track.');
+    return buildFallbackResult(genrePreset, alarmTime, weather);
+  }
+
   const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aetherclock-client',
@@ -205,17 +230,6 @@ export const generateMusicalPrompt = async (
     return result;
   } catch (error) {
     console.error("Context selection failed:", error);
-    return {
-      searchedSong: {
-        title: "On & On",
-        artist: "Cartoon feat. Daniel Levi",
-        youtubeVideoId: FALLBACK_VIDEO_ID,
-        whyExplanation: "AetherClock safety-net track to lift spirits regardless of weather.",
-        foundTheme: "Inspirational",
-        styleDescription: "Energetic electronic pop with positive vocal delivery"
-      },
-      musicalPrompt: "An energetic electronic pop song with bright synths, driving beat, and positive vocals.",
-      lyrics: "When I wake up in the morning, Lord\nAnd the sunlight hurts my eyes\nAnd something without warning, Lord\nBears heavy on my mind\nThen I look at you, and the world's alright with me."
-    };
+    return buildFallbackResult(genrePreset, alarmTime, weather);
   }
 };

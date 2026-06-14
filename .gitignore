@@ -24,6 +24,10 @@ dist-ssr
 *.sw?
 .worktrees/
 
+# Local env files
+.env
+.env.local
+
 # Cloudflare local secrets
 .dev.vars
 cron-worker/.dev.vars
