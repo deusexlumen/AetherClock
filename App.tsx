@@ -17,6 +17,7 @@ import {
   captureInstallPrompt,
 } from './services/pwa';
 import { fetchVapidPublicKey, syncDevice, syncAlarms, unsubscribeDevice } from './services/pushBackend';
+import { getApiKey, setApiKey, hasApiKey } from './services/apiKey';
 import { PushSubscriptionJSON } from './types';
 import { playOfflineFallback, stopOfflineFallback } from './services/offlineAudio';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
@@ -398,6 +399,7 @@ const App: React.FC = () => {
     const parsed = saved !== null ? parseInt(saved, 10) : 30;
     return Number.isNaN(parsed) ? 30 : Math.max(5, parsed);
   });
+  const [geminiApiKey, setGeminiApiKey] = useState<string>(() => getApiKey() ?? '');
   const screenSaverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetScreenSaverTimerRef = useRef<() => void>(() => {});
 
@@ -1693,6 +1695,31 @@ const App: React.FC = () => {
                                  </div>
                                  <p className="text-[7.5px] text-gray-500 font-mono leading-relaxed">
                                      Play a local alarm tone when no internet connection is available at alarm time.
+                                 </p>
+                             </div>
+                             <div className="flex flex-col gap-1">
+                                 <div className="flex items-center gap-2">
+                                     <Mic className="w-3 h-3 text-gray-500" />
+                                     <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider">
+                                         Gemini API Key
+                                     </label>
+                                     {hasApiKey() && (
+                                         <span className="text-[7px] font-mono text-green-500 uppercase">active</span>
+                                     )}
+                                 </div>
+                                 <input
+                                     type="password"
+                                     value={geminiApiKey}
+                                     onChange={(e) => {
+                                         const value = e.target.value;
+                                         setGeminiApiKey(value);
+                                         setApiKey(value);
+                                     }}
+                                     placeholder="Paste your Gemini API key here"
+                                     className="w-full bg-neutral-900 border border-radio-dim/40 rounded px-2 py-1 text-[9px] font-mono text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-radio-lit/60"
+                                 />
+                                 <p className="text-[7.5px] text-gray-500 font-mono leading-relaxed">
+                                     Each user provides their own key. It is stored only in this browser's localStorage and is used for AI-generated music/voice briefings. Get a free key at makersuite.google.com/app/apikey.
                                  </p>
                              </div>
                          </div>

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
+import { getApiKey } from './apiKey';
 import { WeatherData, WEATHER_CODES, CalendarItem, VoiceBriefingConfig, LLMConfig } from '../types';
 
 const DEFAULT_TTS_MODEL = "gemini-3.1-flash";
@@ -16,9 +17,9 @@ export const generateVoiceBriefing = async (
   config: VoiceBriefingConfig,
   llmConfig?: LLMConfig
 ): Promise<BriefingResult> => {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    console.warn('[VoiceBriefing] No GEMINI_API_KEY configured; skipping TTS.');
+    console.warn('[VoiceBriefing] No Gemini API key configured in settings; skipping TTS.');
     return { audioBase64: '', mimeType: 'audio/wav', text: '' };
   }
 

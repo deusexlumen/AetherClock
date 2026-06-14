@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { getApiKey } from './apiKey';
 import { WeatherData, WEATHER_CODES, MusicGenre, SearchedSongMetadata, LLMConfig } from '../types';
 
 // Default model (can be overridden via config)
@@ -155,9 +156,9 @@ export const generateMusicalPrompt = async (
   blacklist?: string,
   config?: LLMConfig
 ): Promise<MusicalPromptResult> => {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
-    console.warn('[generateMusicalPrompt] No GEMINI_API_KEY configured; using fallback track.');
+    console.warn('[generateMusicalPrompt] No Gemini API key configured in settings; using fallback track.');
     return buildFallbackResult(genrePreset, alarmTime, weather);
   }
 
