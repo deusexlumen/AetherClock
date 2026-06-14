@@ -1,6 +1,6 @@
 import { ALARM_NOTIFICATION_OPTIONS } from './notification-config.js';
 
-const CACHE_NAME = 'aetherclock-v2';
+const CACHE_NAME = 'aetherclock-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -9,6 +9,12 @@ const STATIC_ASSETS = [
   '/manifest.json',
   '/notification-config.js',
 ];
+
+const isStaticAsset = (pathname) =>
+  STATIC_ASSETS.includes(pathname) || /\.(js|css|svg|png|json|woff2?)$/.test(pathname);
+
+const isNavigationRequest = (request) =>
+  request.mode === 'navigate' || request.destination === 'document';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -36,18 +42,31 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-  const isStatic = STATIC_ASSETS.some((path) => url.pathname === path);
-  const isAsset = url.pathname.match(/\.(js|css|svg|png|json|woff2?)$/);
 
-  if (isStatic || isAsset) {
+  // Navigation requests (HTML/SPA shell) → network first, fallback to cache.
+  if (isNavigationRequest(event.request)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // Static assets → stale-while-revalidate.
+  if (isStaticAsset(url.pathname)) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
-        return cached || fetch(event.request).then((response) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, response.clone());
-            return response;
-          });
+        const networkFetch = fetch(event.request).then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return response;
         });
+        return cached || networkFetch;
       })
     );
   }
