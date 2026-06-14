@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          version="${{ steps.version.outputs.version }}"
+
+          # Delete the existing tag/release if it already exists, so the release is always current.
+          gh release delete "$tag" --yes 2>/dev/null || true
+          git push origin --delete "$tag" 2>/dev/null || true
+
+          # Create the new tag and release.
+          git tag -a "$tag" -m "AetherClock v$version"
+          git push origin "$tag"
+          gh release create "$tag" \
+            --title "AetherClock v$version" \
+            --generate-notes \
+            --latest
