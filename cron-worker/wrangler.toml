@@ -6,5 +6,13 @@ compatibility_date = "2026-06-01"
 binding = "AETHERCLOCK_KV"
 id = "dd42f5546b3645eb9131b8189b172bf5"
 
+# Both AetherClock deployments must bind the same D1 database.
+# Replace this value with the UUID from `wrangler d1 create` before deployment.
+[[d1_databases]]
+binding = "ALARM_DB"
+database_name = "aetherclock-alarm-index"
+database_id = "REPLACE_WITH_REAL_D1_DATABASE_ID"
+migrations_dir = "../migrations"
+
 [triggers]
 crons = ["* * * * *"]

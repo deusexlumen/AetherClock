@@ -2,10 +2,9 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import { DeviceRecord, PushSubscriptionJSON } from '../../types';
 import { jsonResponse, errorResponse } from '../_shared/cors';
 import { isValidSubscription } from '../_shared/validation';
+import { syncDeviceRegistration, type AlarmRegistryEnv } from '../_shared/alarmRegistry';
 
-interface Env {
-  AETHERCLOCK_KV: KVNamespace;
-}
+interface Env extends AlarmRegistryEnv {}
 
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   let body: Record<string, unknown>;
@@ -38,5 +37,6 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   };
 
   await context.env.AETHERCLOCK_KV.put(key, JSON.stringify(updated));
+  await syncDeviceRegistration(context.env, updated);
   return jsonResponse({ ok: true }, context.request);
 };
