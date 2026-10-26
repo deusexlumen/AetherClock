@@ -17,6 +17,10 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return errorResponse('Invalid JSON', context.request);
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return errorResponse('Expected a JSON object', context.request, 400);
+  }
+
   const deviceId = body.deviceId;
   if (typeof deviceId !== 'string' || deviceId.length === 0) {
     return errorResponse('Missing deviceId', context.request, 422);

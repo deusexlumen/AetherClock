@@ -1,21 +1,19 @@
 // BUXE_OS v24.X -- PLAYLIST SERVICE
 import { MusicGenre, PlaylistTrack, SearchedSongMetadata } from '../types';
 
-// Verified NoCopyrightSounds fallback tracks. NCS releases are royalty-free and
-// generally embeddable worldwide, making them a safe safety net when the AI
-// cannot provide a working youtubeVideoId.
+// Preset tracks used when AI selection fails. Embedding availability is checked
+// by the player at runtime and can vary by region, video and browser.
 export const RELIABLE_NCS_FALLBACKS: Record<string, { title: string; artist: string; whyExplanation: string }> = {
-  'K4DyBUG242c': { title: 'On & On', artist: 'Cartoon feat. Daniel Levi', whyExplanation: 'Energetic NCS fallback tuned to your station preset.' },
-  'TW9d8vYrVFQ': { title: 'Sky High', artist: 'Elektronomia', whyExplanation: 'Uplifting NCS fallback tuned to your station preset.' },
-  'J2X5mJ3HDYE': { title: 'Invincible', artist: 'DEAF KEV', whyExplanation: 'Driving NCS fallback tuned to your station preset.' },
-  '3nQNiWdeH2Q': { title: 'Heroes Tonight', artist: 'Janji feat. Johnning', whyExplanation: 'Motivational NCS fallback tuned to your station preset.' },
-  'p7ZsBPK656s': { title: 'Blank', artist: 'Disfigure', whyExplanation: 'Melodic NCS fallback tuned to your station preset.' },
-  'S19UcWdOA-I': { title: 'Fearless pt.II', artist: 'TULE feat. Chris Linton', whyExplanation: 'Epic NCS fallback tuned to your station preset.' },
-  'yJg-Y5byMMw': { title: 'Mortals', artist: 'Warriyo feat. Laura Brehm', whyExplanation: 'Powerful NCS fallback tuned to your station preset.' },
+  'K4DyBUG242c': { title: 'On & On', artist: 'Cartoon feat. Daniel Levi', whyExplanation: 'Energetic NCS preset track. Availability depends on YouTube.' },
+  'TW9d8vYrVFQ': { title: 'Sky High', artist: 'Elektronomia', whyExplanation: 'Uplifting NCS preset track. Availability depends on YouTube.' },
+  'J2X5mJ3HDYE': { title: 'Invincible', artist: 'DEAF KEV', whyExplanation: 'Driving NCS preset track. Availability depends on YouTube.' },
+  '3nQNiWdeH2Q': { title: 'Heroes Tonight', artist: 'Janji feat. Johnning', whyExplanation: 'Motivational NCS preset track. Availability depends on YouTube.' },
+  'p7ZsBPK656s': { title: 'Blank', artist: 'Disfigure', whyExplanation: 'Melodic NCS preset track. Availability depends on YouTube.' },
+  'S19UcWdOA-I': { title: 'Fearless pt.II', artist: 'TULE feat. Chris Linton', whyExplanation: 'Epic NCS preset track. Availability depends on YouTube.' },
+  'yJg-Y5byMMw': { title: 'Mortals', artist: 'Warriyo feat. Laura Brehm', whyExplanation: 'Powerful NCS preset track. Availability depends on YouTube.' },
 };
 
 const NCS_FALLBACK_IDS = Object.keys(RELIABLE_NCS_FALLBACKS);
-const NCS_CHANNEL_ID = 'UC_aEa8K-EOJ3D6gOs7HcyNg';
 
 const YOUTUBE_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
 
@@ -25,12 +23,16 @@ export const isValidVideoId = (id: string | null | undefined): id is string => {
 
 export const buildEmbedUrl = (videoId: string | null | undefined): string | null => {
   const id = videoId?.trim();
-  if (!id) return null;
-  return `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&modestbranding=1&playlist=${id}&loop=1&enablejsapi=1`;
+  if (!isValidVideoId(id)) return null;
+  return `https://www.youtube.com/embed/${id}?controls=1&playsinline=1&enablejsapi=1`;
 };
 
-export const buildNcsChannelEmbedUrl = (): string => {
-  return `https://www.youtube.com/embed?listType=user_uploads&list=${NCS_CHANNEL_ID}&autoplay=1&controls=0&modestbranding=1&enablejsapi=1`;
+// Stop after two automatic replacements rather than cycling failed IDs forever.
+export const getRecoveryTrack = (failedIds: Set<string>): PlaylistTrack | null => {
+  if (failedIds.size >= 3) return null;
+  const id = NCS_FALLBACK_IDS.find(candidate => !failedIds.has(candidate));
+  if (!id) return null;
+  return { ...RELIABLE_NCS_FALLBACKS[id], youtubeVideoId: id, embedUrl: buildEmbedUrl(id)! };
 };
 
 export const getFallbackTrack = (usedIds: Set<string>): PlaylistTrack => {
@@ -44,7 +46,7 @@ export const getFallbackTrack = (usedIds: Set<string>): PlaylistTrack => {
     title: info?.title || 'AetherClock Radio',
     artist: info?.artist || 'NoCopyrightSounds',
     youtubeVideoId: videoId,
-    embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
+    embedUrl: buildEmbedUrl(videoId)!,
     whyExplanation: info?.whyExplanation || 'Emergency fallback signal tuned to your station preset.',
   };
 };
@@ -52,22 +54,24 @@ export const getFallbackTrack = (usedIds: Set<string>): PlaylistTrack => {
 export const generatePlaylist = async (
   fetchTrackFn: () => Promise<SearchedSongMetadata>,
   trackCount: number,
-  _genre: MusicGenre = 'auto'
+  _genre: MusicGenre = 'auto',
+  firstTrack?: SearchedSongMetadata,
 ): Promise<PlaylistTrack[]> => {
   const tracks: PlaylistTrack[] = [];
   const usedIds = new Set<string>();
   // Cap track generation to avoid excessive API calls during pre-warm
-  const safeTrackCount = Math.min(trackCount, 3);
+  const requestedCount = Number.isFinite(trackCount) ? Math.max(1, Math.min(Math.floor(trackCount), 5)) : 1;
+  const safeTrackCount = Math.min(requestedCount, 3);
 
   // Fetch in parallel for speed
-  const promises = Array.from({ length: safeTrackCount }, () =>
+  const promises = Array.from({ length: safeTrackCount - (firstTrack ? 1 : 0) }, () =>
     fetchTrackFn().catch((err) => {
       console.warn('Playlist track fetch failed', err);
       return null;
     })
   );
 
-  const results = await Promise.all(promises);
+  const results = [...(firstTrack ? [firstTrack] : []), ...await Promise.all(promises)];
 
   for (const meta of results) {
     if (!meta) {
@@ -83,36 +87,19 @@ export const generatePlaylist = async (
         title: meta.title || 'AetherClock Radio',
         artist: meta.artist || 'Unknown Artist',
         youtubeVideoId: videoId,
-        embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
+        embedUrl: buildEmbedUrl(videoId)!,
         whyExplanation: meta.whyExplanation || 'Curated by AetherClock AI.',
       });
     } else {
-      // The AI did not return a usable video ID. Use a reliable fallback so the
-      // alarm never stays silent, but keep the AI's explanation if it helps.
+      // Use the replacement's own metadata; the AI explanation describes a different song.
       const fallback = getFallbackTrack(usedIds);
-      tracks.push({
-        ...fallback,
-        whyExplanation: meta.whyExplanation
-          ? `${meta.whyExplanation} (fallback player)`
-          : fallback.whyExplanation,
-      });
+      tracks.push(fallback);
     }
   }
 
   // Pad with fallbacks until we have the requested number of tracks.
-  while (tracks.length < safeTrackCount) {
+  while (tracks.length < requestedCount) {
     tracks.push(getFallbackTrack(usedIds));
-  }
-
-  // Ultimate safety net: if somehow no tracks were produced, return the NCS
-  // channel uploads player so YouTube serves any available NCS upload.
-  if (tracks.length === 0) {
-    tracks.push({
-      title: 'AetherClock Safety Net',
-      artist: 'NoCopyrightSounds',
-      embedUrl: buildNcsChannelEmbedUrl(),
-      whyExplanation: 'Emergency channel fallback — playing the latest NCS uploads.',
-    });
   }
 
   return tracks;

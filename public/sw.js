@@ -1,37 +1,34 @@
 import { ALARM_NOTIFICATION_OPTIONS } from './notification-config.js';
 
-const CACHE_NAME = 'aetherclock-v3';
+const CACHE_NAME = 'aetherclock-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/index.css',
   '/icon.svg',
   '/manifest.json',
   '/notification-config.js',
+  '/assets/fallback-alarm.wav',
 ];
 
 const isStaticAsset = (pathname) =>
-  STATIC_ASSETS.includes(pathname) || /\.(js|css|svg|png|json|woff2?)$/.test(pathname);
+  STATIC_ASSETS.includes(pathname) || /\.(js|css|svg|png|json|wav|woff2?)$/.test(pathname);
 
 const isNavigationRequest = (request) =>
   request.mode === 'navigate' || request.destination === 'document';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    }).catch(() => {
-      // Silent fail for missing assets during development
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.filter((key) => key.startsWith('aetherclock-') && key !== CACHE_NAME).map((key) => caches.delete(key))
       );
     })
   );
@@ -48,9 +45,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          return response;
+          if (!response.ok) return response;
+          return caches.open(CACHE_NAME)
+            .then((cache) => cache.put(event.request, response.clone()))
+            .catch(() => {})
+            .then(() => response);
         })
         .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/index.html')))
     );
@@ -58,17 +57,20 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Static assets → stale-while-revalidate.
-  if (isStaticAsset(url.pathname)) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        const networkFetch = fetch(event.request).then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          return response;
-        });
-        return cached || networkFetch;
-      })
-    );
+  if (url.origin === self.location.origin && isStaticAsset(url.pathname)) {
+    const networkFetch = fetch(event.request).then(async (response) => {
+      if (response.ok) {
+        try {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
+        } catch {
+          // A full or unavailable cache must not block the network response.
+        }
+      }
+      return response;
+    });
+    event.waitUntil(networkFetch.catch(() => {}));
+    event.respondWith(caches.match(event.request).then((cached) => cached || networkFetch));
   }
 });
 

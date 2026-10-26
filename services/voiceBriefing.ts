@@ -2,7 +2,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { getApiKey } from './apiKey';
 import { WeatherData, WEATHER_CODES, CalendarItem, VoiceBriefingConfig, LLMConfig } from '../types';
 
-const DEFAULT_TTS_MODEL = "gemini-3.1-flash";
+const DEFAULT_TTS_MODEL = "gemini-3.1-flash-tts-preview";
 
 export interface BriefingResult {
   audioBase64: string;
@@ -25,9 +25,7 @@ export const generateVoiceBriefing = async (
 
   const ai = new GoogleGenAI({
     apiKey,
-    httpOptions: {
-      headers: { 'User-Agent': 'aetherclock-client' }
-    }
+    httpOptions: { timeout: 20000 }
   });
 
   const parts: string[] = [];

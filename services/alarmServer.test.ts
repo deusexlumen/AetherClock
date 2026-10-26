@@ -13,6 +13,18 @@ describe('getLocalTimeParts', () => {
     const result = getLocalTimeParts('Mars/Olympus', new Date());
     expect(result).toBeNull();
   });
+
+  it('formats midnight as 00:00 on the correct local day', () => {
+    expect(getLocalTimeParts('Europe/Berlin', new Date('2026-06-14T22:00:00Z')))
+      .toEqual({ time: '00:00', weekday: 'mon' });
+  });
+
+  it('handles the Berlin daylight-saving transition', () => {
+    expect(getLocalTimeParts('Europe/Berlin', new Date('2026-10-25T00:30:00Z')))
+      .toEqual({ time: '02:30', weekday: 'sun' });
+    expect(getLocalTimeParts('Europe/Berlin', new Date('2026-10-25T01:30:00Z')))
+      .toEqual({ time: '02:30', weekday: 'sun' });
+  });
 });
 
 describe('isAlarmFiring', () => {

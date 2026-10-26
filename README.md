@@ -2,7 +2,7 @@
 
 # ⏰ AetherClock
 
-### *An AI-powered, retro-styled radio alarm clock that composes your perfect morning soundtrack.*
+### *A task-based AI radio alarm clock: what is coming next sets the soundtrack.*
 
 [![Live Demo](https://img.shields.io/badge/🔗_Live_Demo-pages.dev-FF6B6B?style=for-the-badge)](https://aetherclock.pages.dev)
 [![GitHub Repo](https://img.shields.io/badge/🔗_GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/deusexlumen/AetherClock)
@@ -27,12 +27,13 @@
 
 ## ✨ What is AetherClock?
 
-**AetherClock** is not just an alarm clock — it's a *personal morning DJ*. Instead of a generic beep, it wakes you up with a curated AI-generated broadcast:
+**AetherClock** turns daily tasks into music alarms. Add a task with a time, category and mood keywords. At that time, an active task starts a broadcast whose music is selected for the activity:
 
-1. 🎙️ **Voice Briefing** — A synthetic voice tells you the time, weather, and your day's agenda
-2. 📻 **Smart Playlist** — Thematic YouTube tracks matched to your mood, weather, and calendar
-3. 🎨 **Immersive Visuals** — 10 retro chassis themes, 3 with live WebGL backgrounds
-4. 📲 **PWA** — Install it, get push notifications, works offline
+1. 🗓️ **Task Alarms** — Each active task triggers at its own time; edits and deactivation update the alarm
+2. 📻 **Task-Based Playlist** — Category and keywords guide the selection: focus/no vocals for a meeting, energy for training, calm for winding down
+3. 🎙️ **Optional Voice Briefing** — A synthetic voice introduces the upcoming tasks, time and weather
+4. 🎨 **Immersive Visuals** — 10 retro chassis themes, 3 with live WebGL backgrounds
+5. 📲 **PWA** — Install it, get push notifications, and use a local alarm sound offline
 
 > *"It's like having a radio station that only plays for you, every morning."*
 
@@ -42,11 +43,16 @@
 
 **→ [https://aetherclock.pages.dev](https://aetherclock.pages.dev)**
 
-No installation required. Open it in your browser, set an alarm, and experience your first AI-curated wake-up.
+Open it in your browser and use **Play your own YouTube link** to test playback without a key. Add your own Gemini key in settings for AI curation and voice briefings. Music playback requires the app to remain open; background push notifications do not automatically start music in a closed app.
 
 ---
 
 ## 🎬 Features in Detail
+
+### 🗓️ Task alarms
+Tasks store their time, category, keywords and armed state in this browser. **Test music** previews a task's selection immediately. The text-list editor preserves categories and keywords, including disabled tasks. Tasks currently form a repeating daily plan, not a dated calendar. Tasks at the same time share one broadcast with their combined context. Additional standalone alarms remain available in settings.
+
+The selected task is supplied explicitly to the AI; its keywords take priority over generic time-of-day or weather suggestions. A Gemini key is required for semantic music selection. If AI is unavailable, the app clearly labels the generic preset fallback. See [task alarm validation](docs/task-alarms.md).
 
 ### 🎙️ AI Voice Briefing
 Wake up to a personalized spoken briefing synthesized via Google Gemini TTS. Choose from three voices:
@@ -72,7 +78,7 @@ Instead of one alarm tone, AetherClock builds a **1–5 track YouTube playlist**
 | 🌙 Night shift | Mellow jazz, chillhop |
 | 🎚️ Genre preset | Synthwave, Classical, Rock, Jazz, Pop, Ambient, Hip-Hop |
 
-Powered by **Google Gemini with Search Grounding** — finds real, embeddable YouTube tracks, not hallucinated songs.
+With a Gemini key, **Google Search grounding** helps select existing YouTube recordings. The app does not synthesize music or change the recording's lyrics. A valid video ID does not guarantee availability: YouTube can restrict embedding, regions, accounts or autoplay. The player reports failures, tries at most two replacement tracks, and offers a local alarm sound. Without a key, the app uses preset tracks and skips the voice briefing.
 
 ### 🎨 10 Retro Themes (3 with Live WebGL)
 
@@ -125,41 +131,37 @@ Every theme morphs the entire UI — colors, glows, scanlines, hardware decals, 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**No backend required.** All AI calls go directly from the browser to Google's API. Your Gemini API key is injected at build time via Vite.
+AI calls go directly from the browser to Google's API using the key entered in the app settings. Background push alarms additionally use Cloudflare Pages Functions, KV, D1 and a scheduled Worker.
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org) ≥ 18
+- [Node.js](https://nodejs.org) 22 or later and pnpm
 - A [Google Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
 
 ### 1. Clone & Install
 ```bash
 git clone https://github.com/deusexlumen/AetherClock.git
 cd AetherClock
-npm install
+pnpm install --frozen-lockfile
 ```
 
-### 2. Configure Environment
-```bash
-cp .env.example .env.local
-# Edit .env.local:
-# GEMINI_API_KEY=your_key_here
-```
+### 2. Configure AI
+Enter your Gemini API key in the app settings. The key is stored in this browser and sent directly to Google. It is not included in the build.
 
 ### 3. Develop
 ```bash
-npm run dev
+pnpm dev
 ```
 → Opens at `http://localhost:3000`
 
 ### 4. Build for Production
 ```bash
-npm run build
+pnpm build
 ```
-→ Outputs to `dist/` — ready for Cloudflare Pages, Netlify, or any static host.
+→ Outputs static assets to `dist/`. Background push alarms also require the Cloudflare Functions, bindings and scheduled Worker described in `docs/kv-quota-fix.md`.
 
 ---
 
@@ -170,10 +172,10 @@ All preferences are persisted in `localStorage` and survive reloads.
 | Category | Options |
 |----------|---------|
 | **Voice Briefing** | On/Off, voice (`Fenrir`/`Kore`/`Leda`), custom greeting, include weather/agenda/time |
-| **Playlist** | On/Off, track count (1–5), shuffle, crossfade |
+| **Playlist** | On/Off, track count (1–5), shuffle; up to three AI selections, with preset tracks filling larger queues |
 | **Loudness** | Standard · Sunrise Progressive (gentle ramp) · Max Impact Shock |
 | **Pre-Warm Engine** | Generates content 60s before alarm time |
-| **Playback Source** | YouTube (AI-curated real songs + verified NCS fallbacks) |
+| **Playback Source** | Your YouTube link, AI selections, or preset NCS tracks; availability is checked by the player |
 | **Theme** | 10 visual presets |
 | **Blacklist** | Comma-separated artists/keywords to avoid |
 | **Notifications** | System push notifications on alarm trigger |
@@ -192,7 +194,7 @@ All preferences are persisted in `localStorage` and survive reloads.
 1. Open **Settings** panel in the app
 2. Toggle **Push Notifications**
 3. Grant browser permission
-4. Receive system notifications even when the app is closed
+4. Receive system notifications when supported by your browser and operating system. Tap a notification to open the app; background delivery does not bypass autoplay restrictions.
 
 ---
 

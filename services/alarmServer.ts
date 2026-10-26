@@ -30,7 +30,7 @@ export const getLocalTimeParts = (timezone: string, date: Date): LocalTimeParts 
   try {
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
-      hour12: false,
+      hourCycle: 'h23',
       hour: '2-digit',
       minute: '2-digit',
       weekday: 'short',

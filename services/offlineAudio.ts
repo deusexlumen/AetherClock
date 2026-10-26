@@ -1,20 +1,28 @@
-const FALLBACK_AUDIO_URL = '/assets/fallback-alarm.mp3';
+const FALLBACK_AUDIO_URL = '/assets/fallback-alarm.wav';
 
 let currentOscillatorNodes: { osc: OscillatorNode; gain: GainNode }[] = [];
 let alarmInterval: ReturnType<typeof setInterval> | null = null;
+let pulseInterval: ReturnType<typeof setInterval> | null = null;
 let audioCtx: AudioContext | null = null;
+let currentAudio: HTMLAudioElement | null = null;
+let playbackGeneration = 0;
 
 export const playOfflineFallback = async (): Promise<void> => {
   stopOfflineFallback();
+  const generation = playbackGeneration;
 
   try {
     const audio = new Audio(FALLBACK_AUDIO_URL);
+    currentAudio = audio;
     audio.loop = true;
     audio.volume = 1.0;
     await audio.play();
   } catch {
     // Fallback to synthesized alarm siren
-    playSirenAlarm();
+    if (generation === playbackGeneration) {
+      currentAudio = null;
+      playSirenAlarm();
+    }
   }
 };
 
@@ -70,9 +78,7 @@ const playSirenAlarm = (): void => {
       osc1.gain.gain.setValueAtTime(0.05, now + 0.35);
       osc1.gain.gain.setValueAtTime(0.3, now + 0.4);
     };
-    const pulseInterval = setInterval(pulseGain, 500);
-    // Store interval on first node for cleanup
-    (osc1 as any)._pulseInterval = pulseInterval;
+    pulseInterval = setInterval(pulseGain, 500);
 
   } catch (e) {
     console.warn('[OfflineAudio] Siren fallback failed:', e);
@@ -80,14 +86,22 @@ const playSirenAlarm = (): void => {
 };
 
 export const stopOfflineFallback = (): void => {
+  playbackGeneration++;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
+  }
   if (alarmInterval) {
     clearInterval(alarmInterval);
     alarmInterval = null;
   }
+  if (pulseInterval) {
+    clearInterval(pulseInterval);
+    pulseInterval = null;
+  }
   currentOscillatorNodes.forEach(({ osc, gain }) => {
     try {
-      const pulseInterval = (osc as any)._pulseInterval;
-      if (pulseInterval) clearInterval(pulseInterval);
       gain.gain.setValueAtTime(0, gain.context.currentTime);
       osc.stop(gain.context.currentTime + 0.1);
     } catch {
