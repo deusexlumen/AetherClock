@@ -9,6 +9,7 @@ export interface CalendarItem {
   time: string; // "HH:MM"
   title: string;
   vibe?: string; // e.g. "work", "sport", "chill", "social", "family"
+  keywords?: string[];
   active: boolean;
 }
 
@@ -17,6 +18,7 @@ export type WeekDay = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 export const WEEKDAYS: readonly WeekDay[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 export interface Alarm {
+  calendarItemId?: string;
   id: string;
   time: string; // "HH:MM"
   label: string;

@@ -2,7 +2,7 @@
 
 # ⏰ AetherClock
 
-### *A retro radio alarm clock with YouTube playback, optional AI curation and voice briefings.*
+### *A task-based AI radio alarm clock: what is coming next sets the soundtrack.*
 
 [![Live Demo](https://img.shields.io/badge/🔗_Live_Demo-pages.dev-FF6B6B?style=for-the-badge)](https://aetherclock.pages.dev)
 [![GitHub Repo](https://img.shields.io/badge/🔗_GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/deusexlumen/AetherClock)
@@ -27,12 +27,13 @@
 
 ## ✨ What is AetherClock?
 
-**AetherClock** is not just an alarm clock — it's a *personal morning DJ*. Instead of a generic beep, it wakes you up with a curated AI-generated broadcast:
+**AetherClock** turns daily tasks into music alarms. Add a task with a time, category and mood keywords. At that time, an active task starts a broadcast whose music is selected for the activity:
 
-1. 🎙️ **Voice Briefing** — A synthetic voice tells you the time, weather, and your day's agenda
-2. 📻 **Smart Playlist** — Thematic YouTube tracks matched to your mood, weather, and calendar
-3. 🎨 **Immersive Visuals** — 10 retro chassis themes, 3 with live WebGL backgrounds
-4. 📲 **PWA** — Install it, get push notifications, works offline
+1. 🗓️ **Task Alarms** — Each active task triggers at its own time; edits and deactivation update the alarm
+2. 📻 **Task-Based Playlist** — Category and keywords guide the selection: focus/no vocals for a meeting, energy for training, calm for winding down
+3. 🎙️ **Optional Voice Briefing** — A synthetic voice introduces the upcoming tasks, time and weather
+4. 🎨 **Immersive Visuals** — 10 retro chassis themes, 3 with live WebGL backgrounds
+5. 📲 **PWA** — Install it, get push notifications, and use a local alarm sound offline
 
 > *"It's like having a radio station that only plays for you, every morning."*
 
@@ -47,6 +48,11 @@ Open it in your browser and use **Play your own YouTube link** to test playback 
 ---
 
 ## 🎬 Features in Detail
+
+### 🗓️ Task alarms
+Tasks store their time, category, keywords and armed state in this browser. **Test music** previews a task's selection immediately. The text-list editor preserves categories and keywords, including disabled tasks. Tasks currently form a repeating daily plan, not a dated calendar. Tasks at the same time share one broadcast with their combined context. Additional standalone alarms remain available in settings.
+
+The selected task is supplied explicitly to the AI; its keywords take priority over generic time-of-day or weather suggestions. A Gemini key is required for semantic music selection. If AI is unavailable, the app clearly labels the generic preset fallback. See [task alarm validation](docs/task-alarms.md).
 
 ### 🎙️ AI Voice Briefing
 Wake up to a personalized spoken briefing synthesized via Google Gemini TTS. Choose from three voices:

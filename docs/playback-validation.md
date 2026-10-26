@@ -20,7 +20,7 @@ YouTube remains an embedded player with visible controls. This app neither extra
 
 ## Validation performed
 
-- `pnpm test`: 85 tests passed, including bounded recovery, strict link parsing, queue reuse, YouTube API timeout/retry, data URL handling, PCM-to-WAV conversion and stale briefing cancellation.
+- `pnpm test`: 100 tests passed, including bounded recovery, strict link parsing, queue reuse, YouTube API timeout/retry, data URL handling, PCM-to-WAV conversion and stale briefing cancellation.
 - `pnpm exec tsc --noEmit` and `pnpm build`: passed.
 - Browser regression: before the fix, TUNE IN showed STOP with zero YouTube Player constructions. After the fix, player creation, autoplay unlock, bounded failed-video recovery, STOP and restart passed with a simulated IFrame API.
 - A separate browser scenario simulated Gemini text and PCM audio responses: briefing playback preceded music and used a single WAV data URL. No paid Gemini request was made for this test.
