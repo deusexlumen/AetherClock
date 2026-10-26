@@ -1945,6 +1945,7 @@ const App: React.FC = () => {
                                          <button
                                             type="button"
                                             onClick={() => handleRemoveItem(item.id)}
+                                            aria-label={`Delete appointment ${item.title}`}
                                             className="p-1 hover:bg-neutral-800 rounded text-gray-600 hover:text-red-500 transition-colors"
                                          >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -1960,6 +1961,7 @@ const App: React.FC = () => {
                              <div className="sm:col-span-3">
                                 <input
                                    type="time"
+                                   aria-label="Appointment time"
                                    value={newTime}
                                    onChange={(e) => setNewTime(e.target.value)}
                                    className="w-full h-8 px-2 bg-neutral-900 border border-neutral-800 rounded font-digital text-sm text-yellow-500 text-center uppercase focus:outline-none focus:border-radio-lit"
@@ -1968,6 +1970,7 @@ const App: React.FC = () => {
                              <div className="sm:col-span-5">
                                 <input
                                    type="text"
+                                   aria-label="Appointment title"
                                    placeholder="NEW APPOINTMENT TITLE..."
                                    value={newTitle}
                                    onChange={(e) => setNewTitle(e.target.value)}
@@ -1977,6 +1980,7 @@ const App: React.FC = () => {
                              </div>
                              <div className="sm:col-span-2">
                                 <select
+                                   aria-label="Appointment category"
                                    value={newVibe}
                                    onChange={(e) => setNewVibe(e.target.value)}
                                    className="w-full h-8 px-1 bg-neutral-900 border border-neutral-800 rounded font-mono text-[10px] text-gray-400 uppercase focus:outline-none focus:border-radio-lit"

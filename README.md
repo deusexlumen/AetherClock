@@ -125,41 +125,37 @@ Every theme morphs the entire UI — colors, glows, scanlines, hardware decals, 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**No backend required.** All AI calls go directly from the browser to Google's API. Your Gemini API key is injected at build time via Vite.
+AI calls go directly from the browser to Google's API using the key entered in the app settings. Background push alarms additionally use Cloudflare Pages Functions, KV, D1 and a scheduled Worker.
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org) ≥ 18
+- [Node.js](https://nodejs.org) 22 or later and pnpm
 - A [Google Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
 
 ### 1. Clone & Install
 ```bash
 git clone https://github.com/deusexlumen/AetherClock.git
 cd AetherClock
-npm install
+pnpm install --frozen-lockfile
 ```
 
-### 2. Configure Environment
-```bash
-cp .env.example .env.local
-# Edit .env.local:
-# GEMINI_API_KEY=your_key_here
-```
+### 2. Configure AI
+Enter your Gemini API key in the app settings. The key is stored in this browser and sent directly to Google. It is not included in the build.
 
 ### 3. Develop
 ```bash
-npm run dev
+pnpm dev
 ```
 → Opens at `http://localhost:3000`
 
 ### 4. Build for Production
 ```bash
-npm run build
+pnpm build
 ```
-→ Outputs to `dist/` — ready for Cloudflare Pages, Netlify, or any static host.
+→ Outputs static assets to `dist/`. Background push alarms also require the Cloudflare Functions, bindings and scheduled Worker described in `docs/kv-quota-fix.md`.
 
 ---
 
