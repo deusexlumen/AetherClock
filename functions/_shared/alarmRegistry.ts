@@ -60,7 +60,7 @@ export const importLegacyDevicesOnce = async (env: AlarmRegistryEnv): Promise<vo
     }
 
     if (page.list_complete) break;
-    if (!page.cursor) throw new Error('KV listing was incomplete without a cursor');
+    if (!('cursor' in page) || !page.cursor) throw new Error('KV listing was incomplete without a cursor');
     cursor = page.cursor;
   } while (cursor);
 
