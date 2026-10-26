@@ -1,28 +1,18 @@
 import { sendNotification, type PushSubscription } from 'web-push-neo';
 import { DeviceRecord, ServerAlarm } from '../../types';
 import { getLocalTimeParts, isAlarmFiring } from '../../services/alarmServer';
+import {
+  importLegacyDevicesOnce,
+  listRegisteredDeviceKeys,
+  unregisterDevice,
+  type AlarmRegistryEnv,
+} from '../../functions/_shared/alarmRegistry';
 
-export interface Env {
-  AETHERCLOCK_KV: KVNamespace;
+export interface Env extends AlarmRegistryEnv {
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
   VAPID_SUBJECT: string;
 }
-
-const listAllDeviceKeys = async (kv: KVNamespace): Promise<string[]> => {
-  const keys: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await kv.list({ prefix: 'device:', cursor });
-    keys.push(...page.keys.map((k) => k.name));
-    if ('cursor' in page) {
-      cursor = page.cursor;
-    } else {
-      cursor = undefined;
-    }
-  } while (cursor);
-  return keys;
-};
 
 const sendAlarmPush = async (
   env: Env,
@@ -63,14 +53,18 @@ const BATCH_SIZE = 25;
 
 export const checkAndFireAlarms = async (env: Env): Promise<void> => {
   const now = new Date();
-  const keys = await listAllDeviceKeys(env.AETHERCLOCK_KV);
+  await importLegacyDevicesOnce(env);
+  const keys = await listRegisteredDeviceKeys(env.ALARM_DB);
 
   for (let i = 0; i < keys.length; i += BATCH_SIZE) {
     const batch = keys.slice(i, i + BATCH_SIZE);
     await Promise.all(
       batch.map(async (name) => {
         const record = await env.AETHERCLOCK_KV.get<DeviceRecord>(name, 'json');
-        if (!record?.subscription || record.alarms.length === 0) return;
+        if (!record?.subscription || !record.alarms.some((alarm) => alarm.isActive)) {
+          await unregisterDevice(env.ALARM_DB, name.slice('device:'.length));
+          return;
+        }
 
         const local = getLocalTimeParts(record.timezone, now);
         if (!local) return;
@@ -92,6 +86,7 @@ export const checkAndFireAlarms = async (env: Env): Promise<void> => {
             name,
             JSON.stringify({ ...record, subscription: null }),
           );
+          await unregisterDevice(env.ALARM_DB, record.deviceId);
         }
       }),
     );

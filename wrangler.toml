@@ -7,6 +7,13 @@ binding = "AETHERCLOCK_KV"
 id = "dd42f5546b3645eb9131b8189b172bf5"
 preview_id = "1c04e784395a4012a84dedd669edf836"
 
+# D1 device index shared with the scheduled cron Worker.
+[[d1_databases]]
+binding = "ALARM_DB"
+database_name = "aetherclock-alarm-index"
+database_id = "60eee70c-4054-46db-aa64-2bccebc6404d"
+migrations_dir = "migrations"
+
 [vars]
 VAPID_PUBLIC_KEY = "BL2JGY9uq0EsSmL6AjM6IY5IDWuceAZSkRgigQzNSvBubkFOBU32h3khGzAO9epXiBzOYZqPcUOx3n0kjiE20ZE"
 VAPID_SUBJECT = "mailto:buxloh@gmail.com"

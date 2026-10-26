@@ -6,5 +6,12 @@ compatibility_date = "2026-06-01"
 binding = "AETHERCLOCK_KV"
 id = "dd42f5546b3645eb9131b8189b172bf5"
 
+# Both AetherClock deployments bind the same D1 database.
+[[d1_databases]]
+binding = "ALARM_DB"
+database_name = "aetherclock-alarm-index"
+database_id = "60eee70c-4054-46db-aa64-2bccebc6404d"
+migrations_dir = "../migrations"
+
 [triggers]
 crons = ["* * * * *"]
