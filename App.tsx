@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Clock } from './components/Clock';
 import { Visualizer } from './components/Visualizer';
 import { PlaylistViewer } from './components/PlaylistViewer';
+import { YouTubePlayer } from './components/YouTubePlayer';
+import { YouTubeInput } from './components/YouTubeInput';
+import { canRetryYouTubeVideo, describeYouTubeError } from './services/youtube';
 import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack } from './types';
 import { fetchWeather } from './services/weather';
 import {
@@ -25,7 +28,7 @@ import { AlarmList } from './components/AlarmList';
 import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
-import { generatePlaylist, getNextTrackIndex, buildEmbedUrl, buildNcsChannelEmbedUrl } from './services/playlist';
+import { generatePlaylist, getNextTrackIndex, getRecoveryTrack, buildEmbedUrl } from './services/playlist';
 import { loadAlarms, saveAlarms, getNextAlarm, getAlarmStatusText, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
 import { BabylonCanvas } from './components/themes/BabylonCanvas';
 import { 
@@ -344,6 +347,11 @@ const App: React.FC = () => {
     return saved !== null ? saved === 'true' : true;
   });
   const [isAutoplayBlocked, setIsAutoplayBlocked] = useState<boolean>(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
+  const [localFallbackActive, setLocalFallbackActive] = useState(false);
+  const [playerAttempt, setPlayerAttempt] = useState(0);
+  const [videoStatus, setVideoStatus] = useState('Loading YouTube');
 
   const [voiceBriefingConfig, setVoiceBriefingConfig] = useState<VoiceBriefingConfig>(() => {
     try {
@@ -453,28 +461,19 @@ const App: React.FC = () => {
 
   // YouTube IFrame Player
   const youtubePlayerRef = useRef<any>(null);
-  const youtubeContainerRef = useRef<HTMLDivElement>(null);
 
   // Refs for stable alarm-check callbacks (initialized with dummies to avoid TDZ)
   const handleGenerateAndPlayRef = useRef<any>(() => {});
   const startPlaybackSequenceRef = useRef<any>(() => {});
   const handleNextTrackRef = useRef<any>(() => {});
   const generationEpochRef = useRef<number>(0);
-  const errorRecoveryIndexRef = useRef<number>(0);
+  const failedVideoIdsRef = useRef(new Set<string>());
   const lastMinuteRef = useRef<string>('');
   const triggeredRef = useRef<Set<string>>(new Set());
   const prewarmedRef = useRef<Set<string>>(new Set());
   const deviceIdRef = useRef<string>(getDeviceId());
   const pushSubscriptionRef = useRef<PushSubscriptionJSON | null>(null);
 
-  const getRecoveryVideoId = (index: number): string | null => {
-    const playlistIds = state.playlist.map(t => t.youtubeVideoId).filter(Boolean) as string[];
-    // Verified NCS fallback IDs; these are royalty-free and embeddable.
-    const emergencyIds = ['K4DyBUG242c', 'TW9d8vYrVFQ', 'J2X5mJ3HDYE', '3nQNiWdeH2Q', 'p7ZsBPK656s', 'S19UcWdOA-I', 'yJg-Y5byMMw'];
-    const allIds = [...new Set([...playlistIds, ...emergencyIds])];
-    if (allIds.length === 0) return null;
-    return allIds[index % allIds.length];
-  };
   // Dual-Planner Tabs
   const [plannerTab, setPlannerTab] = useState<'interactive' | 'textarea'>('interactive');
   
@@ -660,21 +659,6 @@ const App: React.FC = () => {
     }
   }, [state.status, loudnessMode]);
 
-  // Autoplay-Block Erkennung fuer mobile Browser
-  useEffect(() => {
-    if (state.status !== 'playing') return;
-    const timer = setTimeout(() => {
-      if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getPlayerState === 'function') {
-        const playerState = youtubePlayerRef.current.getPlayerState();
-        const YT = (window as any).YT;
-        if (YT && playerState !== YT.PlayerState.PLAYING && playerState !== YT.PlayerState.BUFFERING) {
-          setIsAutoplayBlocked(true);
-        }
-      }
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [state.status, state.currentTrackIndex]);
-
   // Apply dark/light body properties on theme changes
   useEffect(() => {
     const cols = THEMES[currentTheme];
@@ -732,6 +716,12 @@ const App: React.FC = () => {
           setState((prev) => ({ ...prev, currentAlarmId: alarm.id }));
 
           if (!isOnlineStatus && offlineFallbackEnabled) {
+            generationEpochRef.current++;
+            ttsPlayerRef.current.stop();
+            youtubePlayerRef.current?.stopVideo?.();
+            setPlaybackError(null);
+            setIsAutoplayBlocked(false);
+            setLocalFallbackActive(true);
             setState((prev) => ({ ...prev, status: 'playing' }));
             playOfflineFallback();
             if (notificationsEnabled) {
@@ -825,6 +815,12 @@ const App: React.FC = () => {
 
   // Generate Playlist and/or Briefing
   const handleGenerateAndPlay = async (alarmId?: string, preGenerateOnly: boolean = false) => {
+    setPlaybackError(null);
+    setPlaybackNotice(null);
+    setLocalFallbackActive(false);
+    failedVideoIdsRef.current.clear();
+    ttsPlayerRef.current.stop();
+    stopOfflineFallback();
     generationEpochRef.current += 1;
     const epoch = generationEpochRef.current;
 
@@ -872,37 +868,19 @@ const App: React.FC = () => {
       );
       if (epoch !== generationEpochRef.current) return;
 
-      let playlist: PlaylistTrack[] = [];
-
-      if (config.playlistConfig.enabled) {
-        const fetchTrack = () =>
-          generateMusicalPrompt(
-            state.weather,
-            state.location,
-            state.agenda,
-            new Date(),
-            config.alarmTime,
-            config.genrePreset,
-            blacklist,
-            llmConfig
-          ).then((r) => r.searchedSong);
-
-        playlist = await generatePlaylist(fetchTrack, config.playlistConfig.trackCount, config.genrePreset);
-        if (epoch !== generationEpochRef.current) return;
-      } else {
-        if (resultData.searchedSong.youtubeVideoId) {
-          const videoId = resultData.searchedSong.youtubeVideoId;
-          playlist = [
-            {
-              title: resultData.searchedSong.title,
-              artist: resultData.searchedSong.artist,
-              youtubeVideoId: videoId,
-              embedUrl: buildEmbedUrl(videoId) || buildNcsChannelEmbedUrl(),
-              whyExplanation: resultData.searchedSong.whyExplanation,
-            },
-          ];
-        }
-      }
+      const fetchTrack = () => generateMusicalPrompt(
+        state.weather, state.location, state.agenda, new Date(),
+        config.alarmTime, config.genrePreset, blacklist, llmConfig,
+      ).then(result => result.searchedSong);
+      const playlist = await generatePlaylist(
+        fetchTrack,
+        config.playlistConfig.enabled ? config.playlistConfig.trackCount : 1,
+        config.genrePreset,
+        resultData.searchedSong,
+      );
+      if (epoch !== generationEpochRef.current) return;
+      if (!hasApiKey()) setPlaybackNotice('No Gemini key configured. Playing preset tracks; AI curation and voice briefing are unavailable.');
+      else if (resultData.notice) setPlaybackNotice(resultData.notice);
 
       let briefingSrc: string | null = null;
       if (config.voiceBriefingConfig.enabled) {
@@ -926,7 +904,7 @@ const App: React.FC = () => {
       setState((prev) => ({
         ...prev,
         status: 'ready',
-        searchedTrack: resultData.searchedSong,
+        searchedTrack: { ...resultData.searchedSong, ...playlist[0] },
         youtubeEmbedUrl: embedUrl,
         playlist,
         currentTrackIndex: 0,
@@ -938,6 +916,7 @@ const App: React.FC = () => {
       }
       startPlaybackSequenceRef.current(briefingSrc, playlist, config.voiceBriefingConfig);
     } catch (err: any) {
+      if (epoch !== generationEpochRef.current) return;
       console.error(err);
       setState((prev) => ({ ...prev, status: 'error', errorMessage: err?.message || 'Generation failed' }));
     }
@@ -971,7 +950,11 @@ const App: React.FC = () => {
 
   // Advance to next track in playlist
   const handleNextTrack = useCallback(() => {
-    errorRecoveryIndexRef.current = 0;
+    stopOfflineFallback();
+    setLocalFallbackActive(false);
+    failedVideoIdsRef.current.clear();
+    setPlaybackError(null);
+    setPlaybackNotice(null);
     if (state.playlist.length === 0) return;
     if (state.playlist.length === 1) {
       const videoId = state.playlist[0].youtubeVideoId;
@@ -989,10 +972,14 @@ const App: React.FC = () => {
       currentTrackIndex: nextIndex,
       youtubeEmbedUrl: prev.playlist[nextIndex].embedUrl || null,
     }));
-  }, [state.playlist.length, state.currentTrackIndex, currentAlarm, playlistConfig.shuffle]);
+  }, [state.playlist, state.currentTrackIndex, currentAlarm, playlistConfig.shuffle]);
 
   const handlePrevTrack = useCallback(() => {
-    errorRecoveryIndexRef.current = 0;
+    stopOfflineFallback();
+    setLocalFallbackActive(false);
+    failedVideoIdsRef.current.clear();
+    setPlaybackError(null);
+    setPlaybackNotice(null);
     if (state.playlist.length <= 1) return;
     const prevIndex = state.currentTrackIndex === 0 ? state.playlist.length - 1 : state.currentTrackIndex - 1;
     setState(prev => ({
@@ -1014,100 +1001,25 @@ const App: React.FC = () => {
     }
   }, [state.status]);
 
-  // YouTube IFrame Player: initialize once
-  useEffect(() => {
-    if (youtubePlayerRef.current) return; // Already initialized
-
-    const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId
-      || state.searchedTrack?.youtubeVideoId;
-
-    if (!videoId) {
-      console.warn('[YT] No videoId available for player initialization');
+  const handleYouTubeError = (code: number, message?: string) => {
+    setIsAutoplayBlocked(false);
+    const failedId = state.playlist[state.currentTrackIndex]?.youtubeVideoId;
+    if (failedId) failedVideoIdsRef.current.add(failedId);
+    const replacement = canRetryYouTubeVideo(code)
+      ? getRecoveryTrack(failedVideoIdsRef.current)
+      : null;
+    if (replacement) {
+      setPlaybackNotice(`The previous video could not be embedded. Trying ${replacement.title} by ${replacement.artist}.`);
+      setState(prev => ({
+        ...prev,
+        playlist: prev.playlist.map((track, index) => index === prev.currentTrackIndex ? replacement : track),
+        youtubeEmbedUrl: replacement.embedUrl || null,
+      }));
       return;
     }
-
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const createPlayer = () => {
-      if (!youtubeContainerRef.current) {
-        retryTimer = setTimeout(createPlayer, 100);
-        return;
-      }
-      if (youtubePlayerRef.current) return;
-      console.log('[YT] Creating player for video:', videoId);
-      youtubePlayerRef.current = new (window as any).YT.Player(youtubeContainerRef.current, {
-        videoId,
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          modestbranding: 1,
-          rel: 0,
-          enablejsapi: 1,
-        },
-        events: {
-          onReady: () => {
-            console.log('[YT] Player ready');
-          },
-          onError: (event: any) => {
-            console.warn('[YT] Player error code:', event.data);
-            // Embedding errors: 100=not found, 101/150=embedding disabled, 2=invalid param, 5=HTML5 error
-            errorRecoveryIndexRef.current += 1;
-            const nextId = getRecoveryVideoId(errorRecoveryIndexRef.current);
-            if (!nextId) {
-              console.error('[YT] Alle Recovery-IDs erschoepft — springe zum naechsten Track.');
-              errorRecoveryIndexRef.current = 0;
-              handleNextTrackRef.current();
-              return;
-            }
-            console.log('[YT] Retrying with recovery ID:', nextId);
-            youtubePlayerRef.current?.loadVideoById?.(nextId);
-          },
-          onStateChange: (event: any) => {
-            if (event.data === (window as any).YT.PlayerState.ENDED) {
-              handleNextTrackRef.current();
-            }
-          },
-        },
-      });
-    };
-
-    if ((window as any).YT && (window as any).YT.Player) {
-      createPlayer();
-    } else {
-      (window as any).onYouTubeIframeAPIReady = createPlayer;
-    }
-
-    return () => {
-      if (retryTimer) clearTimeout(retryTimer);
-      (window as any).onYouTubeIframeAPIReady = null;
-    };
-  }, []);
-
-  // YouTube IFrame Player: load next video when track changes
-  useEffect(() => {
-    if (!youtubePlayerRef.current || !youtubePlayerRef.current.loadVideoById) return;
-    errorRecoveryIndexRef.current = 0; // Reset recovery on intentional track change
-
-    const videoId = state.playlist[state.currentTrackIndex]?.youtubeVideoId
-      || state.searchedTrack?.youtubeVideoId;
-
-    if (!videoId) {
-      console.warn('[YT] No videoId available for track change');
-      return;
-    }
-
-    youtubePlayerRef.current.loadVideoById(videoId);
-  }, [state.currentTrackIndex]);
-
-  // YouTube IFrame Player: destroy on unmount
-  useEffect(() => {
-    return () => {
-      if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
-        youtubePlayerRef.current.destroy();
-        youtubePlayerRef.current = null;
-      }
-    };
-  }, []);
+    youtubePlayerRef.current?.stopVideo?.();
+    setPlaybackError(message || describeYouTubeError(code));
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 md:p-8 overflow-hidden select-none">
@@ -1321,7 +1233,9 @@ const App: React.FC = () => {
                               </span>
                             )}
                             <div className="text-radio-lit text-xs font-mono border border-radio-lit/30 px-2 py-0.5 rounded shadow-[0_0_5px_rgba(255,51,51,0.3)] uppercase tracking-widest bg-red-950/20">
-                                {state.status === 'idle' ? 'SYSTEM READY' : state.status.replace(/_/g, ' ').toUpperCase()}
+                                {state.status === 'idle' ? 'SYSTEM READY' : state.status === 'playing'
+                                  ? (localFallbackActive ? 'LOCAL ALARM' : playbackError ? 'PLAYBACK UNAVAILABLE' : isAutoplayBlocked ? 'TAP TO PLAY' : videoStatus.toUpperCase())
+                                  : state.status.replace(/_/g, ' ').toUpperCase()}
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5 mt-1">
@@ -1735,18 +1649,18 @@ const App: React.FC = () => {
                       <div className="bg-amber-950/25 border border-amber-500/20 p-3 rounded-lg flex flex-col text-left relative animate-[fadeIn_0.5s_ease-out] shadow-inner mb-2">
                          <div className="flex justify-between items-center pb-1 border-b border-amber-500/10 mb-1.5">
                             <span className="text-[8px] text-yellow-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                              <Radio className="w-2.5 h-2.5 text-radio-lit animate-pulse" /> Live Song Tuned
+                              <Radio className="w-2.5 h-2.5 text-radio-lit" /> Selected Track
                             </span>
                             <span className="text-[7.5px] font-digital text-radio-lit led-text-shadow">
                               STATION {getStationFreq(state.genrePreset)} MHz
                             </span>
                          </div>
                          <div className="text-radio-lit text-xs sm:text-sm font-bold truncate tracking-wider led-text-shadow uppercase flex items-center gap-1">
-                           {state.searchedTrack.title} <span className="text-gray-500 text-[10px] font-normal font-mono normal-case">by</span> {state.searchedTrack.artist}
+                           {(state.playlist[state.currentTrackIndex] || state.searchedTrack).title} <span className="text-gray-500 text-[10px] font-normal font-mono normal-case">by</span> {(state.playlist[state.currentTrackIndex] || state.searchedTrack).artist}
                          </div>
                          
                          <p className="text-[9.5px] sm:text-[10.5px] text-amber-500/80 font-mono leading-normal mt-1 italic pl-1 border-l-2 border-red-500/30">
-                           "{state.searchedTrack.whyExplanation}"
+                           "{(state.playlist[state.currentTrackIndex] || state.searchedTrack).whyExplanation}"
                          </p>
                          
                          <div className="flex justify-between items-center text-[7.5px] text-gray-500 font-mono tracking-wider mt-2 pt-1 border-t border-amber-500/5">
@@ -1783,32 +1697,53 @@ const App: React.FC = () => {
                       />
                     )}
 
+                    {(playbackError || playbackNotice || localFallbackActive) && (
+                      <div role="status" className="rounded border border-amber-500/30 bg-black/40 p-3 text-sm text-amber-200">
+                        <p>{localFallbackActive ? 'Local alarm sound is playing. Press STOP to end it.' : playbackError || playbackNotice}</p>
+                        {playbackError && <div className="flex flex-wrap gap-3 mt-2">
+                          <button type="button" className="underline" onClick={() => {
+                            setPlaybackError(null);
+                            setLocalFallbackActive(false);
+                            stopOfflineFallback();
+                            failedVideoIdsRef.current.clear();
+                            setPlayerAttempt(attempt => attempt + 1);
+                          }}>Retry YouTube</button>
+                          <button type="button" className="underline" onClick={() => {
+                            ttsPlayerRef.current.stop();
+                            youtubePlayerRef.current?.stopVideo?.();
+                            setLocalFallbackActive(true);
+                            void playOfflineFallback();
+                          }}>Play local alarm sound</button>
+                        </div>}
+                      </div>
+                    )}
+                    {state.playlist.length > 0 && <a
+                      className="text-xs text-radio-lit underline py-2 inline-block"
+                      href={`https://www.youtube.com/watch?v=${state.playlist[state.currentTrackIndex]?.youtubeVideoId || ''}`}
+                      target="_blank" rel="noopener noreferrer"
+                    >Open this track on YouTube ↗</a>}
+
                     {/* Visualizer and Stream Progress */}
-                    <div id="visualizer-slot" className={`relative transition-all duration-500 ease-in-out ${(state.status === 'playing' || state.status === 'playing_briefing') ? 'h-32 sm:h-48' : 'h-24'}`}>
+                    <div id="visualizer-slot" className={`relative transition-all duration-500 ease-in-out ${(state.status === 'playing' || state.status === 'playing_briefing') ? 'h-[240px] sm:h-[280px]' : 'h-24'}`}>
                         {(state.status === 'playing' || state.status === 'playing_briefing') ? (
                           <div 
                             className="w-full h-full relative rounded overflow-hidden border-2 border-white/10 shadow-inset-screen pointer-events-auto transition-opacity duration-1000"
                             style={{ opacity: state.status === 'playing' ? 1 : 0.3 }}
                           >
-                            <div className="absolute inset-x-0 top-0 h-full bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%] z-10 pointer-events-none opacity-50 block"></div>
-                            
-                            {/* TRANS-BEAM DIRECT FEED BYPASS CONTROLLER */}
-                            <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5">
-                              <a 
-                                 href={`https://www.youtube.com/watch?v=${state.playlist[state.currentTrackIndex]?.youtubeVideoId || state.searchedTrack?.youtubeVideoId || ''}`}
-                                 target="_blank"
-                                 rel="noreferrer"
-                                 className="flex items-center gap-1 px-2.5 py-1 bg-black/95 hover:bg-radio-lit text-radio-lit hover:text-neutral-50 border border-radio-lit/50 hover:border-transparent rounded text-[9px] uppercase tracking-wider font-mono transition-all shadow-[0_0_8px_var(--radio-glow)] cursor-pointer"
-                                 title="Open direct YouTube trans-beam broadcast in new browser tab to bypass iframe blocks"
-                              >
-                                 <ExternalLink className="w-3 h-3" /> LAUNCH TRANS-BEAM UNLOCKED ↗
-                              </a>
-                            </div>
-
-                            <div 
-                               ref={youtubeContainerRef}
-                               className="w-full h-full opacity-80 mix-blend-screen sepia-[0.3]" 
-                            />
+                            {state.playlist[state.currentTrackIndex]?.youtubeVideoId && (
+                              <YouTubePlayer
+                                key={playerAttempt}
+                                videoId={state.playlist[state.currentTrackIndex].youtubeVideoId!}
+                                playing={state.status === 'playing' && !localFallbackActive && !playbackError}
+                                volume={loudnessMode === 'max_impact' ? 100 : loudnessMode === 'sunrise_progressive' ? Math.min(10, volume) : volume}
+                                onPlayer={(player) => { youtubePlayerRef.current = player; }}
+                                onEnded={() => handleNextTrackRef.current()}
+                                onError={handleYouTubeError}
+                                onBlocked={() => setIsAutoplayBlocked(true)}
+                                onPlaying={() => { setIsAutoplayBlocked(false); setPlaybackError(null); }}
+                                onStatus={setVideoStatus}
+                              />
+                            )}
                           </div>
                         ) : (
                           <div className="w-full h-full relative">
@@ -2015,6 +1950,22 @@ const App: React.FC = () => {
                 </div>
             </div>
 
+            <YouTubeInput onPlay={(videoId) => {
+              generationEpochRef.current++;
+              ttsPlayerRef.current.stop();
+              stopOfflineFallback();
+              failedVideoIdsRef.current.clear();
+              setPlaybackError(null);
+              setPlaybackNotice('Playing your YouTube selection. AI curation and voice briefing are skipped.');
+              setIsAutoplayBlocked(false);
+              setLocalFallbackActive(false);
+              setPlayerAttempt(attempt => attempt + 1);
+              const track = { title: 'Your YouTube selection', artist: 'YouTube', youtubeVideoId: videoId, embedUrl: buildEmbedUrl(videoId)!, whyExplanation: 'Selected directly by you.' };
+              setState(prev => ({ ...prev, status: 'playing', playlist: [track], currentTrackIndex: 0,
+                currentAlarmId: null, generatedForAlarmId: null, briefingAudioSrc: null, youtubeEmbedUrl: track.embedUrl,
+                searchedTrack: { ...track, foundTheme: 'Your choice', styleDescription: 'Direct YouTube playback' } }));
+            }} />
+
             {/* Bottom: Control Deck */}
             <div id="btn-con-deck" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-auto">
                 {/* Next Alarm Summary */}
@@ -2032,30 +1983,33 @@ const App: React.FC = () => {
                 <button
                    id="deck-btn-play"
                    onClick={() => {
-                     if (state.status === 'playing' || state.status === 'playing_briefing') {
+                     if (state.status !== 'idle' && state.status !== 'error') {
+                        generationEpochRef.current++;
                         ttsPlayerRef.current.stop();
                         stopOfflineFallback();
                         if (youtubePlayerRef.current && typeof youtubePlayerRef.current.stopVideo === 'function') {
                           youtubePlayerRef.current.stopVideo();
                         }
+                        setPlaybackError(null);
+                        setPlaybackNotice(null);
+                        setLocalFallbackActive(false);
                         setState(prev => ({ ...prev, status: 'idle', currentAlarmId: null }));
-                     } else if (state.status === 'idle') {
+                     } else {
                         handleGenerateAndPlay();
                      }
                    }}
-                   disabled={state.status !== 'idle' && state.status !== 'playing' && state.status !== 'playing_briefing'}
                    className={`btn-spring col-span-1 rounded shadow-btn active:shadow-btn-pressed flex flex-col items-center justify-center p-2 border-t border-white/5 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit focus-visible:ring-inset`}
-                   aria-label={state.status === 'playing' || state.status === 'playing_briefing' ? 'Stop Tuner' : 'Generate broadcast'}
+                   aria-label={state.status === 'playing' || state.status === 'playing_briefing' ? 'Stop Tuner' : state.status === 'idle' || state.status === 'error' ? 'Generate broadcast' : 'Cancel broadcast preparation'}
                 >
                    {state.status === 'playing' || state.status === 'playing_briefing' ? (
                       <Power className="w-5 h-5 text-red-500 mb-1 drop-shadow-[0_0_3px_rgba(239,68,68,0.5)]" />
-                   ) : state.status !== 'idle' ? (
+                   ) : state.status !== 'idle' && state.status !== 'error' ? (
                       <Loader2 className="w-5 h-5 text-yellow-500 animate-spin mb-1" />
                    ) : (
                       <Play className="w-5 h-5 text-green-500 mb-1 drop-shadow-[0_0_3px_rgba(34,197,94,0.5)]" />
                    )}
                    <span className="text-[8px] font-bold text-gray-300 uppercase">
-                      {state.status === 'playing' || state.status === 'playing_briefing' ? 'STOP' : 'TUNE IN'}
+                      {state.status === 'playing' || state.status === 'playing_briefing' ? 'STOP' : state.status === 'idle' || state.status === 'error' ? 'TUNE IN' : 'CANCEL'}
                    </span>
                 </button>
             </div>
@@ -2104,20 +2058,15 @@ const App: React.FC = () => {
       {/* Autoplay Unlock Overlay */}
       {isAutoplayBlocked && (
         <div 
-          className="fixed inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center gap-4 cursor-pointer"
-          onClick={() => {
-            if (youtubePlayerRef.current?.playVideo) {
-              youtubePlayerRef.current.playVideo();
-            }
-            setIsAutoplayBlocked(false);
-          }}
+          role="dialog" aria-label="Start audio playback"
+          className="fixed inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center gap-4"
         >
-          <span className="text-radio-lit font-mono text-sm uppercase tracking-widest animate-pulse">
-            Broadcast Muted (Click to Listen)
-          </span>
-          <span className="text-gray-500 font-mono text-[10px] uppercase tracking-widest">
-            Tap anywhere to unlock audio
-          </span>
+          <p className="text-white text-center px-6">Your browser requires a tap before it can play audio.</p>
+          <button type="button" className="rounded bg-radio-lit px-6 py-3 text-black font-bold" onClick={() => {
+            youtubePlayerRef.current?.playVideo?.();
+            setIsAutoplayBlocked(false);
+          }}>Start playback</button>
+          <button type="button" className="text-gray-300 underline" onClick={() => setIsAutoplayBlocked(false)}>Back to player</button>
         </div>
       )}
     </div>

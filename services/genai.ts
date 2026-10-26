@@ -3,12 +3,13 @@ import { getApiKey } from './apiKey';
 import { WeatherData, WEATHER_CODES, MusicGenre, SearchedSongMetadata, LLMConfig } from '../types';
 
 // Default model (can be overridden via config)
-const DEFAULT_MODEL_TEXT = "gemini-3.1-flash";
+const DEFAULT_MODEL_TEXT = "gemini-3.5-flash";
 
 // Fallback safety-net track: verified NCS embeddable ID.
 const FALLBACK_VIDEO_ID = 'K4DyBUG242c';
 
 export interface MusicalPromptResult {
+  notice?: string;
   searchedSong: SearchedSongMetadata;
   musicalPrompt: string;
   lyrics: string;
@@ -97,6 +98,12 @@ const parseResult = (bodyText: string, genrePreset: MusicGenre, alarmTime: strin
   try {
     const cleanedText = bodyText.trim().replace(/^```json/, '').replace(/```$/, '').trim();
     const result: MusicalPromptResult = JSON.parse(cleanedText);
+    if (!result?.searchedSong || typeof result.searchedSong.title !== 'string' || typeof result.searchedSong.artist !== 'string') {
+      throw new Error('Invalid song metadata');
+    }
+    if (typeof result.searchedSong.styleDescription !== 'string') result.searchedSong.styleDescription = `Genre preset: ${genrePreset}`;
+    if (typeof result.searchedSong.foundTheme !== 'string') result.searchedSong.foundTheme = 'Radio';
+    if (typeof result.searchedSong.whyExplanation !== 'string') result.searchedSong.whyExplanation = 'Selected by the AI curator.';
     return result;
   } catch (parseError) {
     console.warn("Failed to parse JSON from response, attempting regex fallback...", bodyText);
@@ -129,6 +136,7 @@ const buildFallbackResult = (genrePreset: MusicGenre, alarmTime: string, weather
     : "mild weather";
 
   return {
+    notice: 'AI curation was unavailable. Playing preset tracks instead.',
     searchedSong: {
       title: "On & On",
       artist: "Cartoon feat. Daniel Levi",
@@ -164,11 +172,7 @@ export const generateMusicalPrompt = async (
 
   const ai = new GoogleGenAI({
     apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aetherclock-client',
-      }
-    }
+    httpOptions: { timeout: 20000 }
   });
 
   const weatherDesc = weather

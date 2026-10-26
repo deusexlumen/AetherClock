@@ -2,7 +2,7 @@
 
 # ⏰ AetherClock
 
-### *An AI-powered, retro-styled radio alarm clock that composes your perfect morning soundtrack.*
+### *A retro radio alarm clock with YouTube playback, optional AI curation and voice briefings.*
 
 [![Live Demo](https://img.shields.io/badge/🔗_Live_Demo-pages.dev-FF6B6B?style=for-the-badge)](https://aetherclock.pages.dev)
 [![GitHub Repo](https://img.shields.io/badge/🔗_GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/deusexlumen/AetherClock)
@@ -42,7 +42,7 @@
 
 **→ [https://aetherclock.pages.dev](https://aetherclock.pages.dev)**
 
-No installation required. Open it in your browser, set an alarm, and experience your first AI-curated wake-up.
+Open it in your browser and use **Play your own YouTube link** to test playback without a key. Add your own Gemini key in settings for AI curation and voice briefings. Music playback requires the app to remain open; background push notifications do not automatically start music in a closed app.
 
 ---
 
@@ -72,7 +72,7 @@ Instead of one alarm tone, AetherClock builds a **1–5 track YouTube playlist**
 | 🌙 Night shift | Mellow jazz, chillhop |
 | 🎚️ Genre preset | Synthwave, Classical, Rock, Jazz, Pop, Ambient, Hip-Hop |
 
-Powered by **Google Gemini with Search Grounding** — finds real, embeddable YouTube tracks, not hallucinated songs.
+With a Gemini key, **Google Search grounding** helps select existing YouTube recordings. The app does not synthesize music or change the recording's lyrics. A valid video ID does not guarantee availability: YouTube can restrict embedding, regions, accounts or autoplay. The player reports failures, tries at most two replacement tracks, and offers a local alarm sound. Without a key, the app uses preset tracks and skips the voice briefing.
 
 ### 🎨 10 Retro Themes (3 with Live WebGL)
 
@@ -166,10 +166,10 @@ All preferences are persisted in `localStorage` and survive reloads.
 | Category | Options |
 |----------|---------|
 | **Voice Briefing** | On/Off, voice (`Fenrir`/`Kore`/`Leda`), custom greeting, include weather/agenda/time |
-| **Playlist** | On/Off, track count (1–5), shuffle, crossfade |
+| **Playlist** | On/Off, track count (1–5), shuffle; up to three AI selections, with preset tracks filling larger queues |
 | **Loudness** | Standard · Sunrise Progressive (gentle ramp) · Max Impact Shock |
 | **Pre-Warm Engine** | Generates content 60s before alarm time |
-| **Playback Source** | YouTube (AI-curated real songs + verified NCS fallbacks) |
+| **Playback Source** | Your YouTube link, AI selections, or preset NCS tracks; availability is checked by the player |
 | **Theme** | 10 visual presets |
 | **Blacklist** | Comma-separated artists/keywords to avoid |
 | **Notifications** | System push notifications on alarm trigger |
@@ -188,7 +188,7 @@ All preferences are persisted in `localStorage` and survive reloads.
 1. Open **Settings** panel in the app
 2. Toggle **Push Notifications**
 3. Grant browser permission
-4. Receive system notifications even when the app is closed
+4. Receive system notifications when supported by your browser and operating system. Tap a notification to open the app; background delivery does not bypass autoplay restrictions.
 
 ---
 
