@@ -43,7 +43,7 @@
 
 **→ [https://aetherclock.pages.dev](https://aetherclock.pages.dev)**
 
-Open it in your browser and use **Play your own YouTube link** to test playback without a key. Add your own Gemini key in settings for AI curation and voice briefings. Music playback requires the app to remain open; background push notifications do not automatically start music in a closed app.
+Open it in your browser and use **Play your own YouTube link** to test playback without a key. AI curation and voice briefings use the server-side Gemini pool. You may optionally add personal keys in settings. Music playback requires the app to remain open; background push notifications do not automatically start music in a closed app.
 
 ---
 
@@ -52,7 +52,7 @@ Open it in your browser and use **Play your own YouTube link** to test playback 
 ### 🗓️ Task alarms
 Tasks store their time, category, keywords and armed state in this browser. **Test music** previews a task's selection immediately. The text-list editor preserves categories and keywords, including disabled tasks. Tasks currently form a repeating daily plan, not a dated calendar. Tasks at the same time share one broadcast with their combined context. Additional standalone alarms remain available in settings.
 
-The selected task is supplied explicitly to the AI; its keywords take priority over generic time-of-day or weather suggestions. A Gemini key is required for semantic music selection. If AI is unavailable, the app clearly labels the generic preset fallback. See [task alarm validation](docs/task-alarms.md).
+The selected task is supplied explicitly to the AI; its keywords take priority over generic time-of-day or weather suggestions. A configured server-side Gemini pool or a personal key is required for semantic music selection. If AI is unavailable, the app clearly labels the generic preset fallback. See [task alarm validation](docs/task-alarms.md).
 
 ### 🎙️ AI Voice Briefing
 Wake up to a personalized spoken briefing synthesized via Google Gemini TTS. Choose from three voices:
@@ -78,7 +78,7 @@ Instead of one alarm tone, AetherClock builds a **1–5 track YouTube playlist**
 | 🌙 Night shift | Mellow jazz, chillhop |
 | 🎚️ Genre preset | Synthwave, Classical, Rock, Jazz, Pop, Ambient, Hip-Hop |
 
-With a Gemini key, **Google Search grounding** helps select existing YouTube recordings. The app does not synthesize music or change the recording's lyrics. A valid video ID does not guarantee availability: YouTube can restrict embedding, regions, accounts or autoplay. The player reports failures, tries at most two replacement tracks, and offers a local alarm sound. Without a key, the app uses preset tracks and skips the voice briefing.
+With a Gemini key, **Google Search grounding** helps select existing YouTube recordings. The app does not synthesize music or change the recording's lyrics. A valid video ID does not guarantee availability: YouTube can restrict embedding, regions, accounts or autoplay. The player reports failures, tries at most two replacement tracks, and offers a local alarm sound. If the AI service is unavailable, the app clearly labels preset tracks and skips the voice briefing.
 
 ### 🎨 10 Retro Themes (3 with Live WebGL)
 
@@ -131,7 +131,7 @@ Every theme morphs the entire UI — colors, glows, scanlines, hardware decals, 
 └─────────────────────────────────────────────────────────────┘
 ```
 
-AI calls go directly from the browser to Google's API using the key entered in the app settings. Background push alarms additionally use Cloudflare Pages Functions, KV, D1 and a scheduled Worker.
+AI calls go through the same-origin `/api/generate` Pages Function; only the server contacts Google using its secret key pool and any optional personal keys. Background push alarms additionally use Cloudflare Pages Functions, KV, D1 and a scheduled Worker.
 
 ---
 
@@ -149,7 +149,7 @@ pnpm install --frozen-lockfile
 ```
 
 ### 2. Configure AI
-Enter your Gemini API key in the app settings. The key is stored in this browser and sent directly to Google. It is not included in the build.
+Configure `GEMINI_API_KEY` and optionally `GEMINI_API_KEYS` as Cloudflare Pages secrets (or in an ignored `.dev.vars` for local Pages development). Never use Vite variables for secrets. Run the D1 migrations, build with `pnpm build`, then run `pnpm dev:pages`; plain Vite preview does not serve the AI endpoint. Optional personal keys remain in browser storage and are sent to the server for each request, without server persistence. See [key-pool routing](docs/ai-routing.md).
 
 ### 3. Develop
 ```bash

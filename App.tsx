@@ -802,8 +802,7 @@ const App: React.FC = () => {
         resultData.searchedSong,
       );
       if (epoch !== generationEpochRef.current) return;
-      if (!hasApiKey()) setPlaybackNotice('No Gemini key configured. Playing preset tracks; AI curation and voice briefing are unavailable.');
-      else if (resultData.notice) setPlaybackNotice(resultData.notice);
+      if (resultData.notice) setPlaybackNotice(resultData.notice);
 
       let briefingSrc: string | null = null;
       if (config.voiceBriefingConfig.enabled) {
@@ -1449,8 +1448,8 @@ const App: React.FC = () => {
                                      className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
                                  >
                                      <option value="gemini-3.1-flash-tts-preview">Gemini 3.1 Flash TTS</option>
-                                     <option value="gemini-2.5-flash-tts">Gemini 2.5 Flash TTS</option>
-                                     <option value="gemini-2.5-pro-tts">Gemini 2.5 Pro TTS</option>
+                                     <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS</option>
+                                     <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro TTS</option>
                                  </select>
                              </div>
                          </div>
@@ -1539,7 +1538,7 @@ const App: React.FC = () => {
                                  <div className="flex items-center gap-2">
                                      <Mic className="w-3 h-3 text-gray-500" />
                                      <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider">
-                                         Gemini API Key
+                                         Personal Gemini Key (optional)
                                      </label>
                                      {hasApiKey() && (
                                          <span className="text-[7px] font-mono text-green-500 uppercase">active</span>
@@ -1553,11 +1552,11 @@ const App: React.FC = () => {
                                          setGeminiApiKey(value);
                                          setApiKey(value);
                                      }}
-                                     placeholder="Paste your Gemini API key here"
+                                     placeholder="Optional personal key or comma-separated key pool"
                                      className="w-full bg-neutral-900 border border-radio-dim/40 rounded px-2 py-1 text-[9px] font-mono text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-radio-lit/60"
                                  />
                                  <p className="text-[7.5px] text-gray-500 font-mono leading-relaxed">
-                                     Each user provides their own key. It is stored only in this browser's localStorage and is used for AI-generated music/voice briefings. Get a free key at makersuite.google.com/app/apikey.
+                                     The server provides AI music and voice. Optional personal keys join its pool for your requests and are saved in this browser. Keys from the same Google project share quota.
                                  </p>
                              </div>
                          </div>

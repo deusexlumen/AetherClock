@@ -1,5 +1,5 @@
-import { GoogleGenAI, Modality } from "@google/genai";
-import { getApiKey } from './apiKey';
+import { Modality } from '@google/genai';
+import { generateAI } from './aiTransport';
 import { WeatherData, WEATHER_CODES, CalendarItem, VoiceBriefingConfig, LLMConfig } from '../types';
 
 const DEFAULT_TTS_MODEL = "gemini-3.1-flash-tts-preview";
@@ -17,17 +17,6 @@ export const generateVoiceBriefing = async (
   config: VoiceBriefingConfig,
   llmConfig?: LLMConfig
 ): Promise<BriefingResult> => {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    console.warn('[VoiceBriefing] No Gemini API key configured in settings; skipping TTS.');
-    return { audioBase64: '', mimeType: 'audio/wav', text: '' };
-  }
-
-  const ai = new GoogleGenAI({
-    apiKey,
-    httpOptions: { timeout: 20000 }
-  });
-
   const parts: string[] = [];
 
   if (config.customGreeting) {
@@ -56,7 +45,7 @@ export const generateVoiceBriefing = async (
   const text = parts.join(' ');
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateAI('voice', {
       model: llmConfig?.ttsModel || DEFAULT_TTS_MODEL,
       contents: [{ parts: [{ text }] }],
       config: {
@@ -79,7 +68,7 @@ export const generateVoiceBriefing = async (
 
     return { audioBase64, mimeType, text };
   } catch (error) {
-    console.error('[VoiceBriefing] Generation failed:', error);
+    console.warn('[VoiceBriefing] Voice unavailable.');
     return { audioBase64: '', mimeType: 'audio/wav', text: '' };
   }
 };
