@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality } from '@google/genai';
 import type { PagesFunction } from '@cloudflare/workers-types';
-import { createKeyPoolRouter, resolveApiKeys } from '../_shared/llm/router';
+import { AICapacityError, createKeyPoolRouter, resolveApiKeys } from '../_shared/llm/router';
 import { jsonResponse, errorResponse } from '../_shared/cors';
 import { TEXT_MODELS, VOICE_MODELS } from '../../services/aiModels';
 
@@ -11,6 +11,27 @@ interface Env {
 }
 
 const router = createKeyPoolRouter();
+// Search has its own quota. Exhausting it must not lock ordinary text generation.
+const textOnlyRouter = createKeyPoolRouter();
+
+export async function verifyYouTubeSelection(text: string): Promise<string> {
+  const data = JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
+  const song = data.searchedSong;
+  const id = song?.youtubeVideoId || data.youtubeVideoId;
+  if (!/^[\w-]{11}$/.test(id || '')) throw new Error('No verifiable video ID');
+  const response = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`, { signal: AbortSignal.timeout(5000) });
+  if (!response.ok) throw new Error('Video unavailable');
+  const metadata = await response.json() as { title?: string };
+  if (typeof metadata.title !== 'string') throw new Error('Video metadata unavailable');
+  if (song) {
+    const normalize = (value: string) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const words = normalize(String(song.title || '')).split(' ').filter(Boolean);
+    const actual = normalize(metadata.title);
+    if (!words.length || words.filter(word => actual.split(' ').includes(word)).length / words.length < 0.5) throw new Error('Video title does not match selection');
+  }
+  // oEmbed confirms the recording exists; playback checks embedding/autoplay.
+  return JSON.stringify(data);
+}
 
 /** Atomic shared budgets: limits cannot be bypassed by concurrent isolates. */
 export async function reserveBudget(db: D1Database, ip: string, now = Date.now()): Promise<boolean> {
@@ -74,27 +95,37 @@ export const onRequestPost: PagesFunction<Env> = async context => {
     context.waitUntil(env.ALARM_DB.prepare('DELETE FROM ai_request_budgets WHERE expires_at < ?').bind(Date.now()).run());
     const deadline = Date.now() + 40_000;
     const chain = [incoming.model, ...models.filter(m => m !== incoming.model)];
-    const response = await router.call(chain, keys, async (model, apiKey) => {
+    const execute = (grounded: boolean) => async (model: string, apiKey: string) => {
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new Error('AI deadline exceeded');
-      const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Math.min(12_000, remaining) } });
+      const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Math.min(12_000, remaining), retryOptions: { attempts: 1 } } });
       const voiceName = incoming.config?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName;
       const config = body.kind === 'voice' ? {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ['Fenrir', 'Kore', 'Leda'].includes(voiceName) ? voiceName : 'Kore' } } },
-      } : { systemInstruction: system, responseMimeType: 'application/json', tools: [{ googleSearch: {} }], maxOutputTokens: 4096 };
+      } : { systemInstruction: grounded ? system : `${system || ''}\nGoogle Search is unavailable for this request. Choose only a familiar existing recording with a known YouTube ID. Do not claim to have searched or invent IDs. The server will reject missing videos or mismatched titles.`,
+        responseMimeType: 'application/json', ...(grounded ? { tools: [{ googleSearch: {} }] } : {}), maxOutputTokens: 4096 };
       const params = { model, contents: items.map(item => ({ parts: item.parts.map((part: any) => ({ text: part.text })) })), config };
       let result = await ai.models.generateContent(params);
       if (body.kind === 'music' && result.candidates?.[0]?.finishReason === 'MAX_TOKENS' && Date.now() < deadline) {
         // Exactly one retry for a truncated structured answer, as in the blueprint.
         result = await ai.models.generateContent({ ...params, config: { ...config, maxOutputTokens: 8192,
-          httpOptions: { timeout: Math.min(12_000, deadline - Date.now()) } } });
+          httpOptions: { timeout: Math.min(12_000, deadline - Date.now()), retryOptions: { attempts: 1 } } } });
       }
       if (result.candidates?.[0]?.finishReason === 'MAX_TOKENS') throw new Error('AI response truncated');
       return result;
-    });
+    };
+    let response;
+    let notice: string | undefined;
+    try { response = await router.call(chain, keys, execute(true)); }
+    catch (error) {
+      if (body.kind !== 'music' || !(error instanceof AICapacityError)) throw error;
+      response = await textOnlyRouter.call(chain, keys, execute(false));
+      notice = 'Google Search was unavailable. AI selection was checked against YouTube video metadata; playback availability is checked by the player.';
+    }
     // SDK .text is a prototype getter; include it explicitly for JSON transport.
-    const result = body.kind === 'voice' ? { candidates: response.candidates } : { text: response.text };
+    const result = body.kind === 'voice' ? { candidates: response.candidates }
+      : { text: notice ? await verifyYouTubeSelection(response.text || '') : response.text, ...(notice ? { notice } : {}) };
     const output = jsonResponse(result, request);
     output.headers.set('Cache-Control', 'no-store');
     return output;

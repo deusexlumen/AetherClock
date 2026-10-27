@@ -80,6 +80,7 @@ export const generateMusicalPrompt = async (
     });
     const result = parseResult(response.text || '');
     if (!result) return fallback();
+    if (response.notice) result.notice = response.notice;
     if (!isValidVideoId(result.searchedSong.youtubeVideoId)) {
       const retry = await generateAI('music', {
         model,

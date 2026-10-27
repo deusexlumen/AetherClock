@@ -48,3 +48,13 @@ https://ai.google.dev/gemini-api/docs/google-search/
 Gemma, embeddings and Live models are not interchangeable with this grounded
 structured-text / TTS transport. Per-project quota values remain provider-side;
 the router reacts to actual responses rather than hard-coding the screenshot.
+
+Live testing found that ordinary Lite generation succeeds with the donated key,
+while adding Google Search returns HTTP 429. If the grounded cascade exhausts
+capacity, a separate text-only cascade selects a known recording. The server
+checks its ID with YouTube oEmbed and requires the returned title to match the
+selection. Missing/mismatched videos fail to the existing labeled preset path.
+The UI explicitly discloses this mode; oEmbed does not guarantee autoplay or
+regional playback. Search and ordinary generation have separate cooldown state.
+SDK automatic retries are disabled so only this router controls failover; the
+single explicit truncated-output retry remains enabled.
