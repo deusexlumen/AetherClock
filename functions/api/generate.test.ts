@@ -81,4 +81,21 @@ describe('server AI transport', () => {
     expect(JSON.parse(data.text).searchedSong.title).toBe('Experience');
     expect(mocks.generate.mock.calls.at(-1)![0].config.tools).toBeUndefined();
   });
+  it('corrects one mismatched suggestion using the checked catalog', async () => {
+    let ordinaryCalls = 0;
+    mocks.generate.mockImplementation(params => {
+      if (params.config.tools) return Promise.reject({ status: 429 });
+      ordinaryCalls++;
+      return Promise.resolve({ text: JSON.stringify({ searchedSong: ordinaryCalls === 1
+        ? { title: 'Experience', youtubeVideoId: 'dQw4w9WgXcQ' }
+        : { title: 'River Flows in You', youtubeVideoId: '7maJOI3QMu0' } }) });
+    });
+    vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify({
+      title: url.includes('dQw4w9WgXcQ') ? 'Never Gonna Give You Up' : 'Yiruma - River Flows in You',
+    })))));
+    const response = await call(body());
+    expect(response.status).toBe(200);
+    expect(ordinaryCalls).toBe(2);
+    expect(mocks.generate.mock.calls.at(-1)![0].contents.at(-1).parts[0].text).toContain('ONLY from this catalog');
+  });
 });
