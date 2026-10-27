@@ -1,5 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
-import { getApiKey } from './apiKey';
+import { generateAI } from './aiTransport';
 import { buildMusicContext } from './calendar';
 import { isValidVideoId } from './playlist';
 import { CalendarItem, WeatherData, WEATHER_CODES, MusicGenre, SearchedSongMetadata, LLMConfig } from '../types';
@@ -71,12 +70,9 @@ export const generateMusicalPrompt = async (
   _localTime: Date, alarmTime: string, genrePreset: MusicGenre,
   blacklist?: string, config?: LLMConfig, focusTaskId?: string,
 ): Promise<MusicalPromptResult> => {
-  const apiKey = getApiKey();
-  if (!apiKey) return fallback();
-  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 20000 } });
   const model = config?.textModel || 'gemini-3.5-flash';
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateAI('music', {
       model,
       contents: { parts: [{ text: buildMusicPrompt(calendar, alarmTime, genrePreset, weather, location, focusTaskId) }] },
       config: { systemInstruction: systemInstruction(blacklist), responseMimeType: 'application/json', tools: [{ googleSearch: {} }] },
@@ -84,7 +80,7 @@ export const generateMusicalPrompt = async (
     const result = parseResult(response.text || '');
     if (!result) return fallback();
     if (!isValidVideoId(result.searchedSong.youtubeVideoId)) {
-      const retry = await ai.models.generateContent({
+      const retry = await generateAI('music', {
         model,
         contents: { parts: [{ text: `Find the actual YouTube video ID for ${JSON.stringify({ title: result.searchedSong.title, artist: result.searchedSong.artist })}. Do not invent it. Return {"youtubeVideoId":"ID or empty string"}.` }] },
         config: { responseMimeType: 'application/json', tools: [{ googleSearch: {} }] },
