@@ -1,4 +1,5 @@
 import { generateAI } from './aiTransport';
+import { TEXT_MODELS } from './aiModels';
 import { buildMusicContext } from './calendar';
 import { isValidVideoId } from './playlist';
 import { CalendarItem, WeatherData, WEATHER_CODES, MusicGenre, SearchedSongMetadata, LLMConfig } from '../types';
@@ -70,7 +71,7 @@ export const generateMusicalPrompt = async (
   _localTime: Date, alarmTime: string, genrePreset: MusicGenre,
   blacklist?: string, config?: LLMConfig, focusTaskId?: string,
 ): Promise<MusicalPromptResult> => {
-  const model = config?.textModel || 'gemini-3.5-flash';
+  const model = config?.textModel || TEXT_MODELS[0];
   try {
     const response = await generateAI('music', {
       model,

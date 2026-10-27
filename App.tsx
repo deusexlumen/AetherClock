@@ -1,3 +1,4 @@
+import { TEXT_MODELS, normalizeAIModel } from './services/aiModels';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Clock } from './components/Clock';
 import { Visualizer } from './components/Visualizer';
@@ -313,7 +314,7 @@ const App: React.FC = () => {
       if (saved) return JSON.parse(saved);
     } catch {}
     return {
-      textModel: 'gemini-3.5-flash',
+      textModel: TEXT_MODELS[0],
       ttsModel: 'gemini-3.1-flash-tts-preview'
     };
   });
@@ -1420,7 +1421,7 @@ const App: React.FC = () => {
                              <div className="flex flex-col gap-1">
                                  <label className="text-[8px] font-mono text-gray-500 uppercase">Text / Curation Model</label>
                                  <select
-                                     value={llmConfig.textModel}
+                                     value={normalizeAIModel(llmConfig.textModel)}
                                      onChange={(e) => {
                                          const next = { ...llmConfig, textModel: e.target.value as any };
                                          setLLMConfig(next);
@@ -1428,18 +1429,13 @@ const App: React.FC = () => {
                                      }}
                                      className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
                                  >
-                                     <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-                                     <option value="gemini-3-flash">Gemini 3 Flash</option>
-                                     <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option>
-                                     <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                                     <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
-                                     <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                     {TEXT_MODELS.map(model => <option key={model} value={model}>{model.replace('gemini-', 'Gemini ')}</option>)}
                                  </select>
                              </div>
                              <div className="flex flex-col gap-1">
                                  <label className="text-[8px] font-mono text-gray-500 uppercase">TTS Model</label>
                                  <select
-                                     value={llmConfig.ttsModel}
+                                     value={normalizeAIModel(llmConfig.ttsModel)}
                                      onChange={(e) => {
                                          const next = { ...llmConfig, ttsModel: e.target.value as any };
                                          setLLMConfig(next);

@@ -38,3 +38,13 @@ Run `migrations/0002_ai_request_budgets.sql` before deploying the endpoint.
 For local use: create ignored `.dev.vars`, build, apply migrations using
 `pnpm exec wrangler d1 migrations apply ALARM_DB --local`, then `pnpm dev:pages`.
 Plain Vite serves the frontend without Pages Functions.
+
+The default text cascade is 3.8 Flash → 3.6 Flash → 3.5 Flash-Lite →
+3.1 Flash-Lite → 2.5 Flash → 2.5 Flash-Lite, using verified API model IDs.
+Pro is excluded from the music cascade because the owner's project overview
+shows no available Pro quota. Legacy saved defaults normalize to 3.8 Flash.
+Google Search grounding is supported by these Gemini text families:
+https://ai.google.dev/gemini-api/docs/google-search/
+Gemma, embeddings and Live models are not interchangeable with this grounded
+structured-text / TTS transport. Per-project quota values remain provider-side;
+the router reacts to actual responses rather than hard-coding the screenshot.

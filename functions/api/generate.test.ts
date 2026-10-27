@@ -10,7 +10,7 @@ function dbMock(allowed = true) {
   return { prepare: vi.fn(() => ({ bind: vi.fn(() => ({ run: vi.fn().mockResolvedValue({}) })) })),
     batch: vi.fn().mockResolvedValue(Array.from({ length: 3 }, () => ({ results: allowed ? [{ requests: 1 }] : [] }))) };
 }
-const body = () => ({ kind: 'music', apiKeys: '', request: { model: 'gemini-3.5-flash', contents: { parts: [{ text: 'Find focus music.' }] } } });
+const body = () => ({ kind: 'music', apiKeys: '', request: { model: 'gemini-3.8-flash', contents: { parts: [{ text: 'Find focus music.' }] } } });
 const call = (value: unknown, db = dbMock(), origin = 'https://aetherclock.pages.dev') => onRequestPost({
   request: new Request('https://aetherclock.pages.dev/api/generate', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(value) }),
   env: { GEMINI_API_KEY: 'server-primary', GEMINI_API_KEYS: 'server-extra server-primary', ALARM_DB: db }, waitUntil: vi.fn(),
