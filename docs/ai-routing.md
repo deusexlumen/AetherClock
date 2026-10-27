@@ -58,3 +58,12 @@ The UI explicitly discloses this mode; oEmbed does not guarantee autoplay or
 regional playback. Search and ordinary generation have separate cooldown state.
 SDK automatic retries are disabled so only this router controls failover; the
 single explicit truncated-output retry remains enabled.
+
+Cloudflare runtime validation also found that the installed SDK's explicit
+`retryOptions` path replaces provider status codes with generic Errors. Leave
+that option unset: this SDK then uses one native fetch, and the router receives
+the original quota response. If an ordinary-text suggestion fails video
+verification, one correction request selects a task-matched recording from a
+small catalog of checked piano/classical, study-beat and electronic recordings.
+The corrected choice is verified again before returning. Arbitrary error text,
+keys and prompts are not logged.

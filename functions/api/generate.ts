@@ -13,6 +13,18 @@ interface Env {
 const router = createKeyPoolRouter();
 // Search has its own quota. Exhausting it must not lock ordinary text generation.
 const textOnlyRouter = createKeyPoolRouter();
+// Public oEmbed metadata checked for these recordings. Used only to repair an
+// unverifiable text-only suggestion; the AI must still match the task context.
+const VERIFIED_RECORDINGS = [
+  { youtubeVideoId: '7maJOI3QMu0', title: 'River Flows in You', artist: 'Yiruma', style: 'gentle solo piano, instrumental' },
+  { youtubeVideoId: '4Tr0otuiQuU', title: 'Moonlight Sonata', artist: 'Beethoven', style: 'classical solo piano, instrumental, varied intensity' },
+  { youtubeVideoId: '4fvo_iOuSck', title: 'Clair de Lune', artist: 'Debussy', style: 'calm impressionist piano, instrumental' },
+  { youtubeVideoId: 'NlprozGcs80', title: 'Canon in D Major', artist: 'Pachelbel', style: 'gentle classical, instrumental' },
+  { youtubeVideoId: '5qap5aO4i9A', title: 'lofi hip hop radio', artist: 'Lofi Girl', style: 'relaxed study beats' },
+  { youtubeVideoId: 'TW9d8vYrVFQ', title: 'Sky High', artist: 'Elektronomia', style: 'energetic progressive house' },
+  { youtubeVideoId: 'J2X5mJ3HDYE', title: 'Invincible', artist: 'DEAF KEV', style: 'energetic glitch hop with vocal samples' },
+  { youtubeVideoId: 'K4DyBUG242c', title: 'On & On', artist: 'Cartoon', style: 'electronic pop with vocals' },
+];
 
 export async function verifyYouTubeSelection(text: string): Promise<string> {
   const data = JSON.parse(text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
@@ -98,7 +110,9 @@ export const onRequestPost: PagesFunction<Env> = async context => {
     const execute = (grounded: boolean) => async (model: string, apiKey: string) => {
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new Error('AI deadline exceeded');
-      const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Math.min(12_000, remaining), retryOptions: { attempts: 1 } } });
+      // Do not set retryOptions: SDK 1.52 turns quota responses into generic
+      // errors when that option is present, even with attempts: 1.
+      const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Math.min(12_000, remaining) } });
       const voiceName = incoming.config?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName;
       const config = body.kind === 'voice' ? {
         responseModalities: [Modality.AUDIO],
@@ -110,9 +124,23 @@ export const onRequestPost: PagesFunction<Env> = async context => {
       if (body.kind === 'music' && result.candidates?.[0]?.finishReason === 'MAX_TOKENS' && Date.now() < deadline) {
         // Exactly one retry for a truncated structured answer, as in the blueprint.
         result = await ai.models.generateContent({ ...params, config: { ...config, maxOutputTokens: 8192,
-          httpOptions: { timeout: Math.min(12_000, deadline - Date.now()), retryOptions: { attempts: 1 } } } });
+          httpOptions: { timeout: Math.min(12_000, deadline - Date.now()) } } });
       }
       if (result.candidates?.[0]?.finishReason === 'MAX_TOKENS') throw new Error('AI response truncated');
+      if (body.kind === 'music' && !grounded) {
+        try { await verifyYouTubeSelection(result.text || ''); }
+        catch {
+          const left = deadline - Date.now();
+          if (left <= 0) throw new Error('AI deadline exceeded');
+          // One bounded correction, not an unending video-ID guessing loop.
+          result = await ai.models.generateContent({ ...params,
+            contents: [...params.contents, { parts: [{ text: `The previous recording could not be verified. Select the best task/keyword match ONLY from this catalog, using its exact title and ID. Respect no-vocals requirements and explain the match. Return the original searchedSong JSON schema. If this was an ID-only request, return {"youtubeVideoId":"ID"}. Catalog: ${JSON.stringify(VERIFIED_RECORDINGS)}` }] }],
+            config: { ...config, httpOptions: { timeout: Math.min(12_000, left) } },
+          });
+          if (result.candidates?.[0]?.finishReason === 'MAX_TOKENS') throw new Error('AI response truncated');
+          await verifyYouTubeSelection(result.text || '');
+        }
+      }
       return result;
     };
     let response;
@@ -125,11 +153,12 @@ export const onRequestPost: PagesFunction<Env> = async context => {
     }
     // SDK .text is a prototype getter; include it explicitly for JSON transport.
     const result = body.kind === 'voice' ? { candidates: response.candidates }
-      : { text: notice ? await verifyYouTubeSelection(response.text || '') : response.text, ...(notice ? { notice } : {}) };
+      : { text: response.text, ...(notice ? { notice } : {}) };
     const output = jsonResponse(result, request);
     output.headers.set('Cache-Control', 'no-store');
     return output;
-  } catch {
+  } catch (error) {
+    console.warn('[AI route] Generation unavailable', error instanceof AICapacityError ? 'capacity' : error instanceof Error ? error.name : 'unknown');
     return errorResponse('AI temporarily unavailable', request, 503);
   }
 };
