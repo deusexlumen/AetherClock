@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ generate: vi.fn(), keys: [] as string[] }));
 vi.mock('@google/genai', () => ({ Modality: { AUDIO: 'AUDIO' }, GoogleGenAI: class {
   constructor(options: { apiKey: string }) { mocks.keys.push(options.apiKey); }
   models = { generateContent: mocks.generate };
 } }));
-import { onRequestPost, reserveBudget } from './generate';
+import { onRequestPost, reserveBudget, verifyYouTubeSelection } from './generate';
 
 function dbMock(allowed = true) {
   return { prepare: vi.fn(() => ({ bind: vi.fn(() => ({ run: vi.fn().mockResolvedValue({}) })) })),
@@ -16,6 +16,7 @@ const call = (value: unknown, db = dbMock(), origin = 'https://aetherclock.pages
   env: { GEMINI_API_KEY: 'server-primary', GEMINI_API_KEYS: 'server-extra server-primary', ALARM_DB: db }, waitUntil: vi.fn(),
 } as any);
 beforeEach(() => { mocks.generate.mockReset().mockResolvedValue({ text: '{"ok":true}' }); mocks.keys.length = 0; });
+afterEach(() => vi.unstubAllGlobals());
 
 describe('server AI transport', () => {
   it('uses server env keys without requiring a personal key or returning credentials', async () => {
@@ -50,5 +51,34 @@ describe('server AI transport', () => {
   it('requires all budget reservations to succeed', async () => {
     const db = dbMock(); db.batch.mockResolvedValue([{ results: [{}] }, { results: [] }, { results: [{}] }]);
     expect(await reserveBudget(db as any, '127.0.0.1')).toBe(false);
+  });
+  it('accepts a real video whose title matches, without claiming autoplay is verified', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"title":"Artist - Experience (Official Video)"}')));
+    const text = JSON.stringify({ searchedSong: { title: 'Experience', youtubeVideoId: 'K4DyBUG242c' } });
+    expect(JSON.parse(await verifyYouTubeSelection(text)).searchedSong.title).toBe('Experience');
+  });
+  it('rejects a hallucinated video or a mismatched recording', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"title":"Never Gonna Give You Up"}')));
+    await expect(verifyYouTubeSelection(JSON.stringify({ searchedSong: { title: 'Experience', youtubeVideoId: 'dQw4w9WgXcQ' } }))).rejects.toThrow('does not match');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 404 })));
+    await expect(verifyYouTubeSelection('{"youtubeVideoId":"K4DyBUG242c"}')).rejects.toThrow('Video unavailable');
+  });
+  it('retries one truncated structured response with a larger budget', async () => {
+    mocks.generate.mockResolvedValueOnce({ candidates: [{ finishReason: 'MAX_TOKENS' }] }).mockResolvedValueOnce({ text: '{"ok":true}' });
+    expect((await call(body())).status).toBe(200);
+    expect(mocks.generate.mock.calls[0][0].config.maxOutputTokens).toBe(4096);
+    expect(mocks.generate.mock.calls[1][0].config.maxOutputTokens).toBe(8192);
+  });
+  it('uses ordinary AI plus YouTube verification when the search quota is exhausted', async () => {
+    const selected = JSON.stringify({ searchedSong: { title: 'Experience', youtubeVideoId: 'K4DyBUG242c' } });
+    mocks.generate.mockImplementation(params => params.config.tools
+      ? Promise.reject({ status: 429 }) : Promise.resolve({ text: selected }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"title":"Ludovico Einaudi - Experience"}')));
+    const response = await call(body());
+    expect(response.status).toBe(200);
+    const data = await response.json() as { text: string; notice: string };
+    expect(data.notice).toContain('Google Search was unavailable');
+    expect(JSON.parse(data.text).searchedSong.title).toBe('Experience');
+    expect(mocks.generate.mock.calls.at(-1)![0].config.tools).toBeUndefined();
   });
 });

@@ -9,6 +9,10 @@ const pacificDay = (now: number) => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
 }).format(new Date(now));
 
+export class AICapacityError extends Error {
+  constructor() { super('AI capacity temporarily unavailable'); }
+}
+
 export function createKeyPoolRouter(now = Date.now) {
   const deadKeys = new Set<string>();
   const deadModels = new Set<string>();
@@ -45,7 +49,7 @@ export function createKeyPoolRouter(now = Date.now) {
       }
       // Fail fast instead of waiting through cooldowns and missing an alarm.
       // Do not propagate provider messages, which may contain credentials.
-      throw new Error('AI capacity temporarily unavailable');
+      throw new AICapacityError();
     },
   };
 }
