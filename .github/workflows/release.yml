@@ -40,7 +40,7 @@ jobs:
           git push origin --delete "$tag" 2>/dev/null || true
 
           # Create the new tag and release.
-          git tag -a "$tag" -m "AetherClock v$version"
+          git tag -a -f "$tag" -m "AetherClock v$version"
           git push origin "$tag"
           gh release create "$tag" \
             --title "AetherClock v$version" \
