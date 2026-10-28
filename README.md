@@ -1,11 +1,14 @@
 <div align="center">
 
-# ⏰ AetherClock
+![AetherClock — Your day. Your soundtrack.](docs/aetherclock-banner.png)
 
-### *A task-based AI radio alarm clock: what is coming next sets the soundtrack.*
+# AetherClock
+
+### Your day. Your soundtrack.
+
+A task-based AI radio alarm clock that gives what's next its own soundtrack.
 
 [![Live Demo](https://img.shields.io/badge/🔗_Live_Demo-pages.dev-FF6B6B?style=for-the-badge)](https://aetherclock.pages.dev)
-[![GitHub Repo](https://img.shields.io/badge/🔗_GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/deusexlumen/AetherClock)
 
 <br>
 
@@ -16,10 +19,6 @@
 [![Babylon.js](https://img.shields.io/badge/Babylon.js-v9-FF0000?logo=babylonjs)](https://www.babylonjs.com/)
 [![PWA](https://img.shields.io/badge/PWA-Ready-5A0FC8?logo=pwa)](https://web.dev/progressive-web-apps/)
 [![License](https://img.shields.io/badge/License-MIT-22d3ee)](LICENSE)
-
-<br>
-
-![Preview](https://img.shields.io/badge/🎛️_Retro_Radio_Interface-Cyberpunk_/_Brass_/_Space-1a1a1a?style=for-the-badge&color=ff3333)
 
 </div>
 
@@ -113,25 +112,9 @@ Every theme morphs the entire UI — colors, glows, scanlines, hardware decals, 
 
 ## 🛠️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        BROWSER                              │
-│  ┌─────────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │  React 19   │  │  Vite Build  │  │  Service Worker   │  │
-│  │  (App.tsx)  │  │  (dist/)     │  │  (Cache + Push)   │  │
-│  └──────┬──────┘  └──────────────┘  └───────────────────┘  │
-│         │                                                   │
-│  ┌──────┴──────────────────────────────────────────────┐   │
-│  │              EXTERNAL APIs (Client-Side)             │   │
-│  │  • Google Gemini (GenAI + TTS + Search Grounding)   │   │
-│  │  • Open-Meteo (Weather, no API key)                 │   │
-│  │  • YouTube IFrame API (Playback)                    │   │
-│  │  • Browser Geolocation (GPS)                        │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
+The React PWA stores tasks and settings in the browser, plays YouTube videos, and uses a service worker for caching and the offline fallback tone. Weather comes from Open-Meteo; location access is optional.
 
-AI calls go through the same-origin `/api/generate` Pages Function; only the server contacts Google using its secret key pool and any optional personal keys. Background push alarms additionally use Cloudflare Pages Functions, KV, D1 and a scheduled Worker.
+AI requests go through the same-origin `/api/generate` Cloudflare Pages Function. The server contacts Gemini using its configured key pool or an optional personal key supplied with the request. Background push alarms additionally use Pages Functions, KV, D1 and a scheduled Worker. See [AI routing](docs/ai-routing.md) and [push alarm setup](docs/kv-quota-fix.md).
 
 ---
 
@@ -139,7 +122,7 @@ AI calls go through the same-origin `/api/generate` Pages Function; only the ser
 
 ### Prerequisites
 - [Node.js](https://nodejs.org) 22 or later and pnpm
-- A [Google Gemini API key](https://aistudio.google.com/app/apikey) (free tier works)
+- A [Google Gemini API key](https://aistudio.google.com/app/apikey) for AI features; quota and availability depend on your account
 
 ### 1. Clone & Install
 ```bash
@@ -208,10 +191,8 @@ All preferences are persisted in `localStorage` and survive reloads.
 - [x] Push notifications
 - [x] Babylon.js WebGL animated themes (Vaporwave, Space, Submarine)
 - [x] 10 retro chassis presets
-- [ ] Background alarm via Web Push (serverless periodic sync)
 - [ ] Custom user-uploaded alarm tones
 - [ ] Spotify / Apple Music integration
-- [ ] Multi-alarm support
 - [ ] Gamified wake-up challenges (snooze limits, dismiss puzzles)
 
 ---
