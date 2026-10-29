@@ -1,8 +1,4 @@
-<!-- Banner: assets/banner-*.png pending design; using existing banner meanwhile -->
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/aetherclock-banner.png">
-  <img alt="AetherClock — a neo-retro task radio alarm" src="docs/aetherclock-banner.png" width="100%">
-</picture>
+![AetherClock — Your Day. Your Soundtrack.](docs/aetherclock-banner.png)
 
 # AetherClock
 
