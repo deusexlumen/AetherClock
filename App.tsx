@@ -1,12 +1,7 @@
-import { TEXT_MODELS, normalizeAIModel } from './services/aiModels';
+import { TEXT_MODELS } from './services/aiModels';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Clock } from './components/Clock';
-import { Visualizer } from './components/Visualizer';
-import { PlaylistViewer } from './components/PlaylistViewer';
-import { YouTubePlayer } from './components/YouTubePlayer';
-import { YouTubeInput } from './components/YouTubeInput';
 import { canRetryYouTubeVideo, describeYouTubeError } from './services/youtube';
-import { AppState, CalendarItem, MusicGenre, WEATHER_CODES, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack } from './types';
+import { AppState, CalendarItem, MusicGenre, PlaylistConfig, VoiceBriefingConfig, LLMConfig, PlaylistTrack } from './types';
 import { fetchWeather } from './services/weather';
 import {
   registerServiceWorker,
@@ -24,33 +19,19 @@ import { fetchVapidPublicKey, syncDevice, syncAlarms, unsubscribeDevice } from '
 import { getApiKey, setApiKey, hasApiKey } from './services/apiKey';
 import { PushSubscriptionJSON } from './types';
 import { playOfflineFallback, stopOfflineFallback } from './services/offlineAudio';
-import { PWAInstallPrompt } from './components/PWAInstallPrompt';
-import { AlarmList } from './components/AlarmList';
-import { CalendarPlanner } from './components/CalendarPlanner';
 import { buildMusicContext, calendarToAlarms, formatCalendarToAgenda, loadCalendar, saveCalendar } from './services/calendar';
 import { generateMusicalPrompt } from './services/genai';
 import { generateVoiceBriefing } from './services/voiceBriefing';
 import { TTSPlayer } from './services/ttsPlayer';
 import { generatePlaylist, getNextTrackIndex, getRecoveryTrack, buildEmbedUrl } from './services/playlist';
-import { loadAlarms, saveAlarms, getAlarmStatusText, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
-import { BabylonCanvas } from './components/themes/BabylonCanvas';
-import {
-  Power,
-  Play,
-  Loader2,
-  MapPin,
-  Radio,
-  Compass,
-  Sliders,
-  Settings,
-  Volume2,
-  EyeOff,
-  ListMusic,
-  Mic,
-  Download,
-  WifiOff,
-  Bell
-} from 'lucide-react';
+import { loadAlarms, saveAlarms, getPreAlarmTime, getCurrentWeekDay } from './services/alarm';
+import './styles/neo-retro.css';
+import { AetherClockInterface } from './components/neo-retro/AetherClockInterface';
+import type { AppView } from './components/neo-retro/NeoRetroTypes';
+import { getThemeDefinition } from './components/themes/registry';
+import { getCircadianSnapshot, loadVisualSettings, resolveTheme, saveVisualSettings } from './services/visualSettings';
+import { getNextAlarmOccurrence } from './services/nextAlarm';
+import type { ThemeId, VisualSettings } from './types';
 
 // One-time migration of legacy Lyria localStorage keys to AetherClock keys.
 // Runs at module load so state initializers read the migrated values.
@@ -86,141 +67,6 @@ import {
   }
 })();
 
-const THEMES = {
-  obsidian: {
-    name: "Obsidian Cyberpunk",
-    case: "#151515",
-    face: "#080808",
-    dim: "#2a1212",
-    lit: "#ff3333",
-    glow: "rgba(255, 51, 51, 0.6)",
-    btn: "#222222",
-    bodyBg: "#121212",
-    bodyText: "#e5e5e5",
-    bodyBgGradient: "radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000000 100%)",
-    ledShadow: "0 0 10px rgba(255, 51, 51, 0.7)"
-  },
-  amber: {
-    name: "Sandalwood Amber",
-    case: "#3c2214",
-    face: "#0c0603",
-    dim: "#3a2000",
-    lit: "#f59e0b",
-    glow: "rgba(245, 158, 11, 0.6)",
-    btn: "#2b1b12",
-    bodyBg: "#1b120c",
-    bodyText: "#fcd34d",
-    bodyBgGradient: "radial-gradient(circle at 50% 50%, #291a10 0%, #0f0a06 100%)",
-    ledShadow: "0 0 10px rgba(245, 158, 11, 0.7)"
-  },
-  cobalt: {
-    name: "Futuristic Cobalt",
-    case: "#0f172a",
-    face: "#05070f",
-    dim: "#0c2030",
-    lit: "#38bdf8",
-    glow: "rgba(56, 189, 248, 0.6)",
-    btn: "#1e293b",
-    bodyBg: "#090d16",
-    bodyText: "#cbd5e1",
-    bodyBgGradient: "radial-gradient(circle at 50% 50%, #111827 0%, #030712 100%)",
-    ledShadow: "0 0 10px rgba(56, 189, 248, 0.7)"
-  },
-  ivory: {
-    name: "Ivory Coast Emerald (Light)",
-    case: "#f8fafc",
-    face: "#f1f5f9",
-    dim: "#cbd5e1",
-    lit: "#10b981",
-    glow: "rgba(16, 185, 129, 0.6)",
-    btn: "#e2e8f0",
-    bodyBg: "#e2e8f0",
-    bodyText: "#0f172a",
-    bodyBgGradient: "radial-gradient(circle at 50% 50%, #f1f5f9 0%, #cbd5e1 100%)",
-    ledShadow: "0 0 8px rgba(16, 185, 129, 0.5)"
-  },
-  vaporwave: {
-    name: "Premium Vaporwave Cyber-Luxe 🌴",
-    case: "#2d0b3d",
-    face: "#0d001a",
-    dim: "#5c0066",
-    lit: "#ff00cc",
-    glow: "rgba(255, 0, 204, 0.9)",
-    btn: "#4a154b",
-    bodyBg: "#090013",
-    bodyText: "#ff99ff",
-    bodyBgGradient: "radial-gradient(circle at 50% 40%, #200435 0%, #030006 100%)",
-    ledShadow: "0 0 16px rgba(255, 0, 204, 0.95), 0 0 30px rgba(255, 0, 204, 0.4)"
-  },
-  antique: {
-    name: "Premium Antique Mahogany Brass 📻",
-    case: "#5a3825",
-    face: "#1c0d02",
-    dim: "#442200",
-    lit: "#ff7700",
-    glow: "rgba(255, 119, 0, 0.85)",
-    btn: "#3b1d0b",
-    bodyBg: "#130904",
-    bodyText: "#ffd2a1",
-    bodyBgGradient: "linear-gradient(135deg, #2a140a 0%, #070301 100%)",
-    ledShadow: "0 0 12px rgba(255, 119, 0, 0.8), 0 0 25px rgba(255, 119, 0, 0.3)"
-  },
-  toxic: {
-    name: "Premium Reactor Toxic-Green ☢️",
-    case: "#1b2a1a",
-    face: "#040a04",
-    dim: "#0a290a",
-    lit: "#39ff14",
-    glow: "rgba(57, 255, 20, 0.9)",
-    btn: "#243f24",
-    bodyBg: "#050d05",
-    bodyText: "#99ff99",
-    bodyBgGradient: "radial-gradient(circle at 50% 50%, #102410 0%, #000200 100%)",
-    ledShadow: "0 0 16px rgba(57, 255, 20, 0.9), 0 0 30px rgba(57, 255, 20, 0.4)"
-  },
-  space: {
-    name: "Premium Space Odyssey 🌌",
-    case: "#090d16",
-    face: "#02040a",
-    dim: "#101f30",
-    lit: "#00f0ff",
-    glow: "rgba(0, 240, 255, 0.95)",
-    btn: "#131a26",
-    bodyBg: "#05070c",
-    bodyText: "#b3f0ff",
-    bodyBgGradient: "radial-gradient(circle at 50% 50%, #0d1527 0%, #010204 100%)",
-    ledShadow: "0 0 16px rgba(0, 240, 255, 0.9), 0 0 30px rgba(0, 240, 255, 0.4)"
-  },
-  royal: {
-    name: "Premium Royal Velvet 👑",
-    case: "#2b1a30",
-    face: "#0d0412",
-    dim: "#3a140d",
-    lit: "#ffd700",
-    glow: "rgba(255, 215, 0, 0.95)",
-    btn: "#201024",
-    bodyBg: "#0a0210",
-    bodyText: "#ffe680",
-    bodyBgGradient: "linear-gradient(135deg, #1d0228 0%, #030006 100%)",
-    ledShadow: "0 0 16px rgba(255, 215, 0, 0.9), 0 0 30px rgba(255, 215, 0, 0.4)"
-  },
-  submarine: {
-    name: "Premium Sonar Marine 🛸",
-    case: "#091f24",
-    face: "#01070b",
-    dim: "#042c16",
-    lit: "#22ff44",
-    glow: "rgba(34, 255, 68, 0.95)",
-    btn: "#0a242a",
-    bodyBg: "#01060b",
-    bodyText: "#a3ffa3",
-    bodyBgGradient: "radial-gradient(circle at 50% 50%, #05161f 0%, #000305 100%)",
-    ledShadow: "0 0 16px rgba(34, 255, 68, 0.9), 0 0 35px rgba(0, 150, 255, 0.4)"
-  }
-};
-
-
-
 const App: React.FC = () => {
   const getDeviceId = (): string => {
     let id = localStorage.getItem('aetherclock_device_id');
@@ -255,9 +101,11 @@ const App: React.FC = () => {
 
   // Settings and Customize State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState<'obsidian' | 'amber' | 'cobalt' | 'ivory' | 'vaporwave' | 'antique' | 'toxic' | 'space' | 'royal' | 'submarine'>(() => {
-    return (localStorage.getItem('aetherclock_theme') as any) || 'obsidian';
-  });
+  const [visualSettings, setVisualSettings] = useState<VisualSettings>(() => loadVisualSettings());
+  const [currentTheme, setCurrentTheme] = useState<ThemeId>(visualSettings.themeId);
+  const [themePreviewOverride, setThemePreviewOverride] = useState<ThemeId | null>(null);
+  const [activeView, setActiveView] = useState<AppView>('now');
+  const [systemReducedMotion, setSystemReducedMotion] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [volume, setVolume] = useState<number>(() => {
     const saved = localStorage.getItem('aetherclock_volume');
     const parsed = saved !== null ? parseInt(saved, 10) : 75;
@@ -335,6 +183,14 @@ const App: React.FC = () => {
     return Number.isNaN(parsed) ? 30 : Math.max(5, parsed);
   });
   const [geminiApiKey, setGeminiApiKey] = useState<string>(() => getApiKey() ?? '');
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setSystemReducedMotion(media.matches);
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  const reducedMotion = visualSettings.reducedMotion === 'reduced' || (visualSettings.reducedMotion === 'system' && systemReducedMotion);
+
   const screenSaverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetScreenSaverTimerRef = useRef<() => void>(() => {});
 
@@ -353,6 +209,20 @@ const App: React.FC = () => {
     () => effectiveAlarms.find((a) => a.id === state.currentAlarmId) ?? null,
     [effectiveAlarms, state.currentAlarmId]
   );
+  const nextAlarm = useMemo(() => getNextAlarmOccurrence(effectiveAlarms, clockNow), [effectiveAlarms, clockNow]);
+  useEffect(() => {
+    setThemePreviewOverride(null);
+  }, [state.currentAlarmId]);
+  const resolvedThemeId = themePreviewOverride ?? resolveTheme({
+    globalThemeId: currentTheme,
+    alarmThemeId: currentAlarm?.themeId,
+    randomMode: visualSettings.randomMode,
+    now: clockNow,
+    alarmId: currentAlarm ? `${currentAlarm.id}:${clockNow.getFullYear()}-${clockNow.getMonth()}-${clockNow.getDate()}` : undefined,
+  });
+  const activeTheme = getThemeDefinition(resolvedThemeId);
+  const circadian = getCircadianSnapshot(clockNow, state.weather?.isDay);
+
   // Screen saver logic
   const resetScreenSaverTimer = () => {
     if (screenSaverTimerRef.current) {
@@ -587,23 +457,25 @@ const App: React.FC = () => {
     }
   }, [state.status, loudnessMode]);
 
-  // Apply dark/light body properties on theme changes
+  // Apply theme tokens and keep visual preferences backward-compatible.
   useEffect(() => {
-    const cols = THEMES[currentTheme];
-    if (!cols) return;
+    const cols = activeTheme.colors;
     document.documentElement.style.setProperty('--body-bg', cols.bodyBg);
     document.documentElement.style.setProperty('--body-text', cols.bodyText);
     document.documentElement.style.setProperty('--body-bg-gradient', cols.bodyBgGradient);
     document.documentElement.style.setProperty('--led-shadow', cols.ledShadow);
-    
-    // Set custom radio structural token properties for real-time morphing
     document.documentElement.style.setProperty('--radio-case', cols.case);
     document.documentElement.style.setProperty('--radio-face', cols.face);
     document.documentElement.style.setProperty('--radio-dim', cols.dim);
     document.documentElement.style.setProperty('--radio-lit', cols.lit);
     document.documentElement.style.setProperty('--radio-glow', cols.glow);
     document.documentElement.style.setProperty('--radio-btn', cols.btn);
-  }, [currentTheme]);
+    document.documentElement.dataset.aetherTheme = resolvedThemeId;
+  }, [activeTheme, resolvedThemeId]);
+
+  useEffect(() => {
+    saveVisualSettings(visualSettings);
+  }, [visualSettings]);
 
   // Alarm Check trigger loop
   useEffect(() => {
@@ -945,917 +817,152 @@ const App: React.FC = () => {
     setPlaybackError(message || describeYouTubeError(code));
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 overflow-hidden select-none">
-      <style>{`
-        @keyframes vaporPulse {
-          0%, 100% { filter: drop-shadow(0 0 5px #ff00cc) brightness(0.9); }
-          50% { filter: drop-shadow(0 0 15px #ff00cc) brightness(1.2); }
-        }
-        @keyframes sonarPing {
-          0% { transform: scale(0.6) translate(-50%, -50%); opacity: 0.8; }
-          100% { transform: scale(2.2) translate(-50%, -50%); opacity: 0; }
-        }
-        @keyframes starryTwinkle {
-          0%, 100% { opacity: 0.15; }
-          50% { opacity: 0.85; }
-        }
-        @keyframes spaceScanner {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        @keyframes warningStatic {
-          0% { transform: translate(0,0); }
-          50% { transform: translate(-1px, 1px); }
-          100% { transform: translate(1px, -1px); }
-        }
-        @keyframes luxuryCrest {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        @keyframes signalRay {
-          0% { opacity: 0.2; }
-          50% { opacity: 0.7; }
-          100% { opacity: 0.2; }
-        }
-        .animate-vapor-pulse { animation: vaporPulse 3s infinite ease-in-out; }
-        .animate-sonar-ping { animation: sonarPing 4s infinite cubic-bezier(0.1, 0.8, 0.3, 1); transform-origin: top left; }
-        .animate-starry-twinkle { animation: starryTwinkle 4s infinite ease-in-out; }
-        .animate-space-scanner { animation: spaceScanner 8s infinite linear; }
-        .animate-warning-static { animation: warningStatic 0.15s infinite; }
-        .animate-luxury-crest { background-size: 200% 200%; animation: luxuryCrest 6s infinite ease-in-out; }
-        .animate-signal-ray { animation: signalRay 2s infinite ease-in-out; }
-        
-        /* LED warm-up glow instead of instant on */
-        @keyframes ledWarmUp {
-          0% { opacity: 0; box-shadow: 0 0 0px currentColor; }
-          40% { opacity: 0.6; box-shadow: 0 0 4px currentColor; }
-          100% { opacity: 1; box-shadow: 0 0 8px currentColor, 0 0 16px currentColor; }
-        }
-        .led-warm-up {
-          animation: ledWarmUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-        }
-        
-        /* Springy button press */
-        .btn-spring {
-          transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
-        }
-        .btn-spring:active {
-          transform: scale(0.92) translateY(1px);
-        }
-        
-        /* Subtle ambient pulse for active elements */
-        @keyframes ambientPulse {
-          0%, 100% { box-shadow: 0 0 5px rgba(255, 51, 51, 0.2); }
-          50% { box-shadow: 0 0 15px rgba(255, 51, 51, 0.5); }
-        }
-        .ambient-pulse {
-          animation: ambientPulse 3s infinite ease-in-out;
-        }
-        
-        .sonar-grid-bg {
-          background-image: 
-            linear-gradient(rgba(34, 255, 68, 0.02) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(34, 255, 68, 0.02) 1px, transparent 1px);
-          background-size: 24px 24px;
-        }
-      `}</style>
-      
-      {/* WebGPU Theme Background */}
-      <BabylonCanvas theme={currentTheme} />
+  const handlePlayToggle = () => {
+    if (state.status !== 'idle' && state.status !== 'error') {
+      pendingTaskAlarmRef.current = null;
+      generationEpochRef.current++;
+      ttsPlayerRef.current.stop();
+      stopOfflineFallback();
+      youtubePlayerRef.current?.stopVideo?.();
+      setPlaybackError(null);
+      setPlaybackNotice(null);
+      setLocalFallbackActive(false);
+      setState(prev => ({ ...prev, status: 'idle', currentAlarmId: null }));
+    } else {
+      void handleGenerateAndPlay();
+    }
+  };
 
-      {/* The Device Case */}
-      <div id="device-wrapper" className="relative z-10 bg-radio-case w-full max-w-5xl rounded-xl shadow-device border-t border-white/10 p-6 md:p-10 flex flex-col lg:flex-row gap-8 transition-all duration-300 overflow-hidden">
-         
-         {/* THEME SPECIFIC CHASSIS OVERLAYS & HARDWARE DECALS */}
-         {currentTheme === 'vaporwave' && (
-           <>
-             <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-pink-500/10 to-transparent pointer-events-none z-0 mix-blend-screen animate-pulse"></div>
-             <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-[#ff00cc]/5 rounded-full blur-2xl pointer-events-none"></div>
-             <div className="absolute -left-12 -top-12 w-48 h-48 bg-[#38bdf8]/5 rounded-full blur-2xl pointer-events-none"></div>
-           </>
-         )}
-         {currentTheme === 'antique' && (
-           <>
-             {/* Simulated brass screw rivets on the outer chassis cabinet corners */}
-             <div className="absolute top-3 left-3 w-3 h-3 rounded-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-200 via-yellow-600 to-amber-950 shadow-md border border-amber-900/40 pointer-events-none z-20 flex items-center justify-center">
-                <div className="w-1.5 h-[1px] bg-amber-950/80 transform rotate-45"></div>
-             </div>
-             <div className="absolute top-3 right-3 w-3 h-3 rounded-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-200 via-yellow-600 to-amber-950 shadow-md border border-amber-900/40 pointer-events-none z-20 flex items-center justify-center">
-                <div className="w-1.5 h-[1px] bg-amber-950/80 transform -rotate-12"></div>
-             </div>
-             <div className="absolute bottom-3 left-3 w-3 h-3 rounded-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-200 via-yellow-600 to-amber-950 shadow-md border border-amber-900/40 pointer-events-none z-20 flex items-center justify-center">
-                <div className="w-1.5 h-[1px] bg-amber-950/80 transform rotate-12"></div>
-             </div>
-             <div className="absolute bottom-3 right-3 w-3 h-3 rounded-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-200 via-yellow-600 to-amber-950 shadow-md border border-amber-900/40 pointer-events-none z-20 flex items-center justify-center">
-                <div className="w-1.5 h-[1px] bg-amber-950/80 transform -rotate-45"></div>
-             </div>
-           </>
-         )}
-         {currentTheme === 'toxic' && (
-           <>
-             {/* Biohazard security striped yellow/black hazard warning trim at the top & bottom margins */}
-             <div className="absolute top-0 inset-x-0 h-1.5 bg-[repeating-linear-gradient(45deg,#eab308,#eab308_10px,#000_10px,#000_20px)] opacity-60 border-b border-black/30 pointer-events-none z-20"></div>
-             <div className="absolute bottom-0 inset-x-0 h-1.5 bg-[repeating-linear-gradient(45deg,#eab308,#eab308_10px,#000_10px,#000_20px)] opacity-60 border-t border-black/30 pointer-events-none z-20"></div>
-             <div className="absolute inset-y-0 left-0 w-1 bg-[repeating-linear-gradient(0deg,#eab308,#eab308_10px,#000_10px,#000_20px)] opacity-40 pointer-events-none z-20"></div>
-             <div className="absolute inset-y-0 right-0 w-1 bg-[repeating-linear-gradient(0deg,#eab308,#eab308_10px,#000_10px,#000_20px)] opacity-40 pointer-events-none z-20"></div>
-           </>
-         )}
-         {currentTheme === 'space' && (
-           <>
-             {/* Star twinkling animation elements inside the chassis container */}
-             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(0,180,255,0.08)_0%,transparent_60%)] pointer-events-none z-0"></div>
-             <div className="absolute top-1/4 left-1/3 w-1 h-3 bg-white rounded-full animate-starry-twinkle pointer-events-none"></div>
-             <div className="absolute top-2/3 left-1/2 w-1.5 h-1.5 bg-[#00f0ff] rounded-full animate-starry-twinkle pointer-events-none" style={{ animationDelay: '1.5s' }}></div>
-             <div className="absolute top-1/3 right-1/4 w-1 h-1 bg-[#d8b4fe] rounded-full animate-starry-twinkle pointer-events-none" style={{ animationDelay: '3s' }}></div>
-             {/* Laser blue tech bar indicators at the top and bottom edge */}
-             <div className="absolute top-0 inset-x-0 h-0.5 bg-cyan-400 opacity-80 pointer-events-none z-20 shadow-[0_0_10px_#00f0ff]"></div>
-             <div className="absolute bottom-0 inset-x-0 h-0.5 bg-purple-500 opacity-80 pointer-events-none z-20 shadow-[0_0_10px_rgba(168,85,247,0.8)]"></div>
-             {/* Crosshair design elements in the corners */}
-             <div className="absolute top-2 left-2 text-[7px] text-cyan-400 font-mono tracking-widest opacity-60 pointer-events-none z-20">SYS_LOCKED_HD</div>
-             <div className="absolute bottom-2 right-2 text-[7px] text-cyan-400 font-mono tracking-widest opacity-60 pointer-events-none z-20">GRID_SECTOR_07</div>
-           </>
-         )}
-         {currentTheme === 'royal' && (
-           <>
-             {/* Gold frame fillets and royal crown vector accent lines */}
-             <div className="absolute inset-0 border-[3px] border-amber-500/30 rounded-xl pointer-events-none z-20 mix-blend-color-dodge"></div>
-             <div className="absolute inset-1.5 border border-amber-500/15 rounded-lg pointer-events-none z-20"></div>
-             <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-amber-500/20 text-amber-300 font-mono text-[8px] uppercase tracking-widest px-4 py-0.5 rounded-b-md border-x border-b border-amber-500/40 pointer-events-none z-20 font-bold">
-                 👑 EXCLUSIVE CABINET V.I.P 👑
-              </div>
-             <div className="absolute left-2 inset-y-8 w-[1px] bg-gradient-to-b from-transparent via-amber-500/40 to-transparent pointer-events-none"></div>
-             <div className="absolute right-2 inset-y-8 w-[1px] bg-gradient-to-b from-transparent via-amber-500/40 to-transparent pointer-events-none"></div>
-           </>
-         )}
-         {currentTheme === 'submarine' && (
-           <>
-             {/* Sonar sweep target vector grid lines */}
-             <div className="absolute inset-0 sonar-grid-bg pointer-events-none z-0"></div>
-             <div className="absolute top-1/2 left-1/2 w-64 h-64 border border-green-500/25 rounded-full pointer-events-none z-0 animate-sonar-ping"></div>
-             <div className="absolute top-1/2 left-1/2 w-64 h-64 border border-green-500/10 rounded-full pointer-events-none z-0 animate-sonar-ping" style={{ animationDelay: '2s' }}></div>
-             <div className="absolute top-4 left-4 flex items-center gap-1.5 pointer-events-none z-20">
-               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-               <span className="text-[7.5px] font-mono text-green-400 tracking-widest uppercase">SONAR RE-CON PING: ON</span>
-             </div>
-             <div className="absolute bottom-4 left-4 text-[7px] text-green-500 font-mono tracking-widest uppercase pointer-events-none z-20">
-               DEPTH REG: 2400 METERS
-             </div>
-           </>
-         )}
+  const handleNotificationsChange = async (enabled: boolean) => {
+    if (enabled) {
+      await enablePushNotifications();
+      return;
+    }
+    setNotificationsEnabled(false);
+    localStorage.setItem('aetherclock_notifications', 'false');
+    try {
+      await unsubscribeFromPush();
+      await unsubscribeDevice(deviceIdRef.current);
+      pushSubscriptionRef.current = null;
+    } catch (error) {
+      console.error('[Push] unsubscribe failed', error);
+    }
+  };
 
-         {/* Left: Vintage Speaker Grille with dynamic badge status */}
-         <div id="speaker-deck" className="hidden lg:flex w-32 xl:w-40 flex-shrink-0 flex-col justify-between relative">
-             <div className="absolute inset-x-0 top-0 bottom-24 bg-speaker-grille bg-[length:8px_8px] opacity-70 rounded-lg shadow-inset-screen border border-black"></div>
-             
-             {/* Sub System diagnostics Dial Info */}
-             <div className="absolute bottom-28 left-1/2 -translate-x-1/2 w-[85%] bg-black/85 border border-white/10 p-2 rounded text-[8px] font-mono text-center text-radio-dim uppercase tracking-wider leading-relaxed z-10">
-               <span className="text-radio-lit/80 block led-text-shadow font-digital">TUNING STATS</span>
-               SYSTEM: COMM<br/>
-               BAND: AM/FM<br/>
-               VIBE: PROG_CUR
-             </div>
+  const handleGenreChange = (genrePreset: MusicGenre) => {
+    setState(prev => ({ ...prev, genrePreset, searchedTrack: null, playlist: [], currentTrackIndex: 0 }));
+  };
 
-             {/* Badge */}
-             <div id="radio-badge" className="mt-auto w-full bg-black/80 border border-white/20 py-2 rounded text-[7px] xl:text-[9px] font-mono text-radio-dim uppercase tracking-wider text-center z-20 leading-tight">
-                MODEL:<br/><span className="text-radio-lit led-text-shadow">AETHERCLOCK</span>
-             </div>
-         </div>
+  const handleYouTubeSelection = (videoId: string) => {
+    pendingTaskAlarmRef.current = null;
+    generationEpochRef.current++;
+    ttsPlayerRef.current.stop();
+    stopOfflineFallback();
+    failedVideoIdsRef.current.clear();
+    setPlaybackError(null);
+    setPlaybackNotice('Playing your YouTube selection. AI curation and voice briefing are skipped.');
+    setIsAutoplayBlocked(false);
+    setLocalFallbackActive(false);
+    setPlayerAttempt(attempt => attempt + 1);
+    const track = { title: 'Your YouTube selection', artist: 'YouTube', youtubeVideoId: videoId, embedUrl: buildEmbedUrl(videoId)!, whyExplanation: 'Selected directly by you.' };
+    setState(prev => ({ ...prev, status: 'playing', playlist: [track], currentTrackIndex: 0,
+      currentAlarmId: null, generatedForAlarmId: null, briefingAudioSrc: null, youtubeEmbedUrl: track.embedUrl,
+      searchedTrack: { ...track, foundTheme: 'Your choice', styleDescription: 'Direct YouTube playback' } }));
+  };
 
-         {/* Right: Main Interface Deck */}
-         <div id="interface-deck" className="flex-1 flex flex-col gap-6 relative z-10">
-            
-            {/* Top Display Panel (Glass Face) */}
-            <div id="face-screen" className="bg-radio-face border-4 border-radio-dim rounded-lg p-6 relative shadow-inset-screen overflow-hidden min-h-[320px] flex flex-col">
-                {/* Glass Glare */}
-                <div className="absolute top-0 right-0 w-2/3 h-full bg-gradient-to-l from-white/5 to-transparent pointer-events-none transform skew-x-12 z-20"></div>
-                
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-0 mb-4 relative z-10 border-b border-radio-dim/40 pb-3">
-                    <div className="flex flex-col w-full sm:w-auto overflow-hidden">
-                        <span className="text-radio-lit text-xs font-mono uppercase tracking-widest opacity-80 flex items-center gap-2 w-full">
-                             <MapPin className="w-3.5 h-3.5 text-radio-lit flex-shrink-0" /> 
-                             {state.location ? (
-                               <span className="font-digital tracking-widest truncate">{state.location}</span>
-                             ) : "ACQUIRING COORDS..."}
-                        </span>
-                        <div className="flex items-center gap-2 mt-1.5">
-                             <span className="font-digital text-xl text-radio-lit led-text-shadow">
-                               {state.weather ? `${state.weather.temperature}°C` : "--°C"}
-                             </span>
-                             {state.weather && (
-                               <span className="text-[9px] font-mono text-gray-500 uppercase tracking-widest pt-1 border-l border-white/10 pl-2">
-                                 {WEATHER_CODES[state.weather.conditionCode] || 'Clear'}
-                                </span>
-                             )}
-                        </div>
-                    </div>
-                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
-                        <div className="flex items-center gap-2">
-                            {!isOnlineStatus && (
-                              <span className="text-[8px] font-mono text-yellow-500 uppercase tracking-wider flex items-center gap-1 animate-pulse">
-                                <WifiOff className="w-3 h-3" /> OFFLINE
-                              </span>
-                            )}
-                            <div className="text-radio-lit text-xs font-mono border border-radio-lit/30 px-2 py-0.5 rounded shadow-[0_0_5px_rgba(255,51,51,0.3)] uppercase tracking-widest bg-red-950/20">
-                                {state.status === 'idle' ? 'SYSTEM READY' : state.status === 'playing'
-                                  ? (localFallbackActive ? 'LOCAL ALARM' : playbackError ? 'PLAYBACK UNAVAILABLE' : isAutoplayBlocked ? 'TAP TO PLAY' : videoStatus.toUpperCase())
-                                  : state.status.replace(/_/g, ' ').toUpperCase()}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1">
-                            <button 
-                                id="btn-settings-toggle"
-                                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                                className={`text-[10px] sm:text-[11px] font-mono border px-2 py-0.5 rounded uppercase tracking-widest transition-all flex items-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit
-                                  ${isSettingsOpen 
-                                    ? 'bg-radio-lit/10 border-radio-lit text-radio-lit shadow-[0_0_5px_rgba(255,51,51,0.3)]' 
-                                    : 'text-gray-400 hover:text-white border-gray-700 hover:border-gray-500'
-                                  }
-                                `}
-                                aria-label="Toggle Settings panel"
-                            >
-                                <Settings className="w-3 h-3 animate-[spin_5s_linear_infinite]" /> CONFIG
-                            </button>
-                        </div>
-                    </div>
-                </div>
+  const handleRetryYouTube = () => {
+    setPlaybackError(null);
+    setLocalFallbackActive(false);
+    stopOfflineFallback();
+    failedVideoIdsRef.current.clear();
+    setPlayerAttempt(attempt => attempt + 1);
+  };
 
-                {/* SYSTEM CONFIGURATION DRAWER SCREEN OVERLAY */}
-                {isSettingsOpen && (
-                  <div className="bg-neutral-900/95 border-2 border-radio-lit/30 rounded p-4 flex flex-col gap-3 text-left animate-[fadeIn_0.3s_ease-out] relative z-30 mb-4 shadow-inset-screen overflow-y-auto max-h-[340px]">
-                     <div className="flex justify-between items-center pb-1.5 border-b border-radio-dim/40">
-                         <span className="text-[10px] text-radio-lit font-bold uppercase tracking-widest flex items-center gap-1.5 led-text-shadow">
-                            <Settings className="w-3.5 h-3.5" /> SYSTEM CORES CONFIGURATION
-                         </span>
-                         <button 
-                            onClick={() => setIsSettingsOpen(false)}
-                            className="text-[9px] font-mono text-gray-500 hover:text-radio-lit uppercase hover:underline"
-                         >
-                            [CLOSE]
-                         </button>
-                     </div>
-                     
-                     {/* 1. Theme selection */}
-                     <div className="flex flex-col gap-1">
-                         <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider">Aesthetic Chassis & HUD Theme</label>
-                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                             {Object.entries(THEMES).map(([key, t]) => (
-                                 <button
-                                     key={key}
-                                     type="button"
-                                     onClick={() => {
-                                         setCurrentTheme(key as any);
-                                         localStorage.setItem('aetherclock_theme', key);
-                                     }}
-                                     className={`p-1.5 rounded font-mono text-[8px] sm:text-[9px] font-bold uppercase border tracking-wider transition-all duration-100 text-center
-                                         ${currentTheme === key
-                                             ? 'bg-neutral-850 border-radio-lit text-radio-lit shadow-inner bg-opacity-90 leading-none py-2'
-                                             : 'bg-neutral-800/20 border-white/5 text-gray-400 hover:text-gray-150 hover:border-white/10 shadow-sm leading-none py-2'
-                                         }`}
-                                 >
-                                     {t.name.replace("Premium ", "")} {['vaporwave', 'antique', 'toxic', 'space', 'royal', 'submarine'].includes(key) ? '★' : ''}
-                                 </button>
-                             ))}
-                         </div>
-                     </div>
+  const handlePlayLocalAlarm = () => {
+    ttsPlayerRef.current.stop();
+    youtubePlayerRef.current?.stopVideo?.();
+    setLocalFallbackActive(true);
+    void playOfflineFallback();
+  };
 
-                     {/* Alarms */}
-                     <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
-                         <div className="flex items-center gap-2">
-                             <Bell className="w-3 h-3 text-radio-lit" />
-                             <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">Additional standalone alarms</span>
-                         </div>
-                         <AlarmList
-                             alarms={state.alarms}
-                             onChange={(nextAlarms) => setState((prev) => ({ ...prev, alarms: nextAlarms }))}
-                             defaultPlaylistConfig={playlistConfig}
-                             defaultVoiceBriefingConfig={voiceBriefingConfig}
-                         />
-                     </div>
+  const handleSelectTheme = (themeId: ThemeId) => {
+    setThemePreviewOverride(themeId);
+    setCurrentTheme(themeId);
+    setVisualSettings(prev => ({ ...prev, themeId, randomMode: 'off' }));
+  };
 
-                     {/* 2. Output Volume Level */}
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                         <div className="flex flex-col gap-1">
-                             <div className="flex justify-between items-center">
-                                <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                                   <Volume2 className="w-3 h-3 text-radio-lit" /> Volume Output Level
-                                </label>
-                                <span className="text-[10px] font-digital text-radio-lit led-text-shadow">{volume}%</span>
-                             </div>
-                             <input 
-                                 type="range"
-                                 min="0"
-                                 max="100"
-                                 value={volume}
-                                 onChange={(e) => {
-                                     const v = parseInt(e.target.value, 10);
-                                     setVolume(v);
-                                     localStorage.setItem('aetherclock_volume', String(v));
-                                 }}
-                                 className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
-                             />
-                         </div>
-
-                         {/* 3. Loudness Auto-Regulation Selection */}
-                         <div className="flex flex-col gap-1">
-                             <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider">Wake-up Loudness Regulation</label>
-                             <select
-                                 value={loudnessMode}
-                                 onChange={(e) => {
-                                     const mode = e.target.value as any;
-                                     setLoudnessMode(mode);
-                                     localStorage.setItem('aetherclock_loudness', mode);
-                                 }}
-                                 className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
-                             >
-                                 <option value="standard">STANDARD (FIXED TARGET AMPLITUDE)</option>
-                                 <option value="sunrise_progressive">SUNRISE PROGRESSIVE (GENTLE RAMP UP)</option>
-                                 <option value="max_impact">MAX IMPACT SHOCK ALARM (100% BOOST)</option>
-                             </select>
-                         </div>
-                     </div>
-
-                     {/* 4. Pre-Warm Option & Blacklist Filters */}
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                         <div className="flex flex-col gap-1 justify-center">
-                             <div className="flex items-center gap-2">
-                                 <input 
-                                     id="prewarm-toggle"
-                                     type="checkbox"
-                                     checked={isPreWarmEnabled}
-                                     onChange={(e) => {
-                                         const enabled = e.target.checked;
-                                         setIsPreWarmEnabled(enabled);
-                                         localStorage.setItem('aetherclock_prewarm', String(enabled));
-                                     }}
-                                     className="w-3.5 h-3.5 rounded border-neutral-700 text-radio-lit bg-neutral-900 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-radio-lit"
-                                 />
-                                 <label htmlFor="prewarm-toggle" className="text-[9px] font-mono text-gray-300 uppercase tracking-wider select-none cursor-pointer">
-                                     Pre-Warm Engine (Tuning 60s prior)
-                                 </label>
-                             </div>
-                             <p className="text-[7.5px] text-gray-500 font-mono mt-0.5 leading-relaxed uppercase">
-                                 Generates and buffers the personalized radio track exactly 1 min before play so there is no delay at wake-up.
-                             </p>
-                         </div>
-
-                         <div className="flex flex-col gap-1">
-                             <label htmlFor="blacklist-input" className="text-[9.5px] font-mono text-gray-400 uppercase tracking-wider flex items-center gap-1">
-                                 <EyeOff className="w-3 h-3 text-red-500" /> Forbidden Keywords & Artists
-                             </label>
-                             <input 
-                                 id="blacklist-input"
-                                 type="text"
-                                 placeholder="E.G. JUSTIN BIEBER, NICKELBACK..."
-                                 value={blacklist}
-                                 onChange={(e) => {
-                                     setBlacklist(e.target.value);
-                                     localStorage.setItem('aetherclock_blacklist', e.target.value);
-                                 }}
-                                 className="w-full bg-neutral-850 border border-white/5 rounded px-2.5 py-1 text-[9px] font-mono uppercase text-amber-300 placeholder-yellow-800/20 outline-none focus:border-radio-lit"
-                             />
-                         </div>
-                     </div>
-
-                     {/* 5. Voice Briefing */}
-                     <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
-                         <div className="flex items-center gap-2">
-                             <Mic className="w-3 h-3 text-radio-lit" />
-                             <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">Voice Briefing</span>
-                             <input
-                                 type="checkbox"
-                                 checked={voiceBriefingConfig.enabled}
-                                 onChange={(e) => {
-                                     const next = { ...voiceBriefingConfig, enabled: e.target.checked };
-                                     setVoiceBriefingConfig(next);
-                                     localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next));
-                                 }}
-                                 className="ml-auto w-3.5 h-3.5 rounded border-neutral-700 text-radio-lit bg-neutral-900 accent-radio-lit cursor-pointer"
-                             />
-                         </div>
-                         {voiceBriefingConfig.enabled && (
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-5">
-                                 <select
-                                     value={voiceBriefingConfig.voiceName}
-                                     onChange={(e) => {
-                                         const next = { ...voiceBriefingConfig, voiceName: e.target.value as any };
-                                         setVoiceBriefingConfig(next);
-                                         localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next));
-                                     }}
-                                     className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
-                                 >
-                                     <option value="Fenrir">FENRIR</option>
-                                     <option value="Kore">KORE</option>
-                                     <option value="Leda">LEDA</option>
-                                 </select>
-                                 <input
-                                     type="text"
-                                     placeholder="CUSTOM GREETING..."
-                                     value={voiceBriefingConfig.customGreeting}
-                                     onChange={(e) => {
-                                         const next = { ...voiceBriefingConfig, customGreeting: e.target.value };
-                                         setVoiceBriefingConfig(next);
-                                         localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next));
-                                     }}
-                                     className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono text-amber-300 placeholder-yellow-800/20 outline-none focus:border-radio-lit"
-                                 />
-                                 <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
-                                     <input type="checkbox" checked={voiceBriefingConfig.includeWeather} onChange={(e) => { const next = { ...voiceBriefingConfig, includeWeather: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Weather
-                                 </label>
-                                 <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
-                                     <input type="checkbox" checked={voiceBriefingConfig.includeAgenda} onChange={(e) => { const next = { ...voiceBriefingConfig, includeAgenda: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Agenda
-                                 </label>
-                                 <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
-                                     <input type="checkbox" checked={voiceBriefingConfig.includeTime} onChange={(e) => { const next = { ...voiceBriefingConfig, includeTime: e.target.checked }; setVoiceBriefingConfig(next); localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Time
-                                 </label>
-                             </div>
-                         )}
-                     </div>
-
-                     {/* 6. Playlist */}
-                     <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
-                         <div className="flex items-center gap-2">
-                             <ListMusic className="w-3 h-3 text-radio-lit" />
-                             <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">Playlist</span>
-                             <input
-                                 type="checkbox"
-                                 checked={playlistConfig.enabled}
-                                 onChange={(e) => {
-                                     const next = { ...playlistConfig, enabled: e.target.checked };
-                                     setPlaylistConfig(next);
-                                     localStorage.setItem('aetherclock_playlist', JSON.stringify(next));
-                                 }}
-                                 className="ml-auto w-3.5 h-3.5 rounded border-neutral-700 text-radio-lit bg-neutral-900 accent-radio-lit cursor-pointer"
-                             />
-                         </div>
-                         {playlistConfig.enabled && (
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-5">
-                                 <div className="flex flex-col gap-0.5">
-                                     <label className="text-[8px] font-mono text-gray-500 uppercase">Tracks ({playlistConfig.trackCount})</label>
-                                     <input
-                                         type="range" min="1" max="5"
-                                         value={playlistConfig.trackCount}
-                                         onChange={(e) => {
-                                             const next = { ...playlistConfig, trackCount: parseInt(e.target.value) };
-                                             setPlaylistConfig(next);
-                                             localStorage.setItem('aetherclock_playlist', JSON.stringify(next));
-                                         }}
-                                         className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
-                                     />
-                                 </div>
-
-                                 <label className="flex items-center gap-1.5 text-[9px] font-mono text-gray-400 uppercase cursor-pointer">
-                                     <input type="checkbox" checked={playlistConfig.shuffle} onChange={(e) => { const next = { ...playlistConfig, shuffle: e.target.checked }; setPlaylistConfig(next); localStorage.setItem('aetherclock_playlist', JSON.stringify(next)); }} className="w-3 h-3 accent-radio-lit" /> Shuffle
-                                 </label>
-                             </div>
-                         )}
-                     </div>
-
-                     {/* 7. LLM Model Selection */}
-                     <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
-                         <div className="flex items-center gap-2">
-                             <Sliders className="w-3 h-3 text-radio-lit" />
-                             <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">LLM Models</span>
-                         </div>
-                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-5">
-                             <div className="flex flex-col gap-1">
-                                 <label className="text-[8px] font-mono text-gray-500 uppercase">Text / Curation Model</label>
-                                 <select
-                                     value={normalizeAIModel(llmConfig.textModel)}
-                                     onChange={(e) => {
-                                         const next = { ...llmConfig, textModel: e.target.value as any };
-                                         setLLMConfig(next);
-                                         localStorage.setItem('aetherclock_llm', JSON.stringify(next));
-                                     }}
-                                     className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
-                                 >
-                                     {TEXT_MODELS.map(model => <option key={model} value={model}>{model.replace('gemini-', 'Gemini ')}</option>)}
-                                 </select>
-                             </div>
-                             <div className="flex flex-col gap-1">
-                                 <label className="text-[8px] font-mono text-gray-500 uppercase">TTS Model</label>
-                                 <select
-                                     value={normalizeAIModel(llmConfig.ttsModel)}
-                                     onChange={(e) => {
-                                         const next = { ...llmConfig, ttsModel: e.target.value as any };
-                                         setLLMConfig(next);
-                                         localStorage.setItem('aetherclock_llm', JSON.stringify(next));
-                                     }}
-                                     className="w-full bg-neutral-850 border border-white/5 rounded px-2 py-1 text-[9px] font-mono uppercase text-gray-300 outline-none focus:border-radio-lit"
-                                 >
-                                     <option value="gemini-3.1-flash-tts-preview">Gemini 3.1 Flash TTS</option>
-                                     <option value="gemini-2.5-flash-preview-tts">Gemini 2.5 Flash TTS</option>
-                                     <option value="gemini-2.5-pro-preview-tts">Gemini 2.5 Pro TTS</option>
-                                 </select>
-                             </div>
-                         </div>
-                     </div>
-
-                     {/* 8. PWA & Notifications */}
-                     <div className="flex flex-col gap-2 mt-1 border-t border-radio-dim/40 pt-2">
-                         <div className="flex items-center gap-2">
-                             <Download className="w-3 h-3 text-radio-lit" />
-                             <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">PWA & System</span>
-                         </div>
-                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-5">
-                             <div className="flex flex-col gap-1">
-                                 <div className="flex items-center gap-2">
-                                     <Bell className="w-3 h-3 text-gray-500" />
-                                     <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider cursor-pointer flex items-center gap-1.5">
-                                         <input
-                                             type="checkbox"
-                                             checked={notificationsEnabled}
-                                             onChange={async (e) => {
-                                                 const enabled = e.target.checked;
-                                                 if (enabled) {
-                                                     const ok = await enablePushNotifications();
-                                                     if (!ok) {
-                                                         setNotificationsEnabled(false);
-                                                         localStorage.setItem('aetherclock_notifications', 'false');
-                                                     }
-                                                 } else {
-                                                     setNotificationsEnabled(false);
-                                                     localStorage.setItem('aetherclock_notifications', 'false');
-                                                     try {
-                                                         await unsubscribeFromPush();
-                                                         await unsubscribeDevice(deviceIdRef.current);
-                                                         pushSubscriptionRef.current = null;
-                                                     } catch (err) {
-                                                         console.error('[Push] unsubscribe failed', err);
-                                                     }
-                                                 }
-                                             }}
-                                             className="w-3 h-3 accent-radio-lit cursor-pointer"
-                                         />
-                                         Push Notifications
-                                     </label>
-                                 </div>
-                                 <p className="text-[7.5px] text-gray-500 font-mono leading-relaxed">
-                                     Show system notifications when the alarm fires, even if the app is in the background.
-                                 </p>
-                             </div>
-                             <div className="flex flex-col gap-1">
-                                 <div className="flex flex-col gap-0.5">
-                                     <label className="text-[8px] font-mono text-gray-500 uppercase">Screensaver Timeout ({screenSaverTimeout}s)</label>
-                                     <input
-                                         type="range" min="5" max="300" step="5"
-                                         value={screenSaverTimeout}
-                                         onChange={(e) => {
-                                             const val = parseInt(e.target.value);
-                                             setScreenSaverTimeout(val);
-                                             localStorage.setItem('aetherclock_screensaver_timeout', String(val));
-                                         }}
-                                         className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-radio-lit"
-                                     />
-                                 </div>
-                             </div>
-                             <div className="flex flex-col gap-1">
-                                 <div className="flex items-center gap-2">
-                                     <WifiOff className="w-3 h-3 text-gray-500" />
-                                     <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider cursor-pointer flex items-center gap-1.5">
-                                         <input
-                                             type="checkbox"
-                                             checked={offlineFallbackEnabled}
-                                             onChange={(e) => {
-                                                 const enabled = e.target.checked;
-                                                 setOfflineFallbackEnabled(enabled);
-                                                 localStorage.setItem('aetherclock_offline_fallback', String(enabled));
-                                             }}
-                                             className="w-3 h-3 accent-radio-lit cursor-pointer"
-                                         />
-                                         Offline Fallback Tone
-                                     </label>
-                                 </div>
-                                 <p className="text-[7.5px] text-gray-500 font-mono leading-relaxed">
-                                     Play a local alarm tone when no internet connection is available at alarm time.
-                                 </p>
-                             </div>
-                             <div className="flex flex-col gap-1">
-                                 <div className="flex items-center gap-2">
-                                     <Mic className="w-3 h-3 text-gray-500" />
-                                     <label className="text-[9px] font-mono text-gray-400 uppercase tracking-wider">
-                                         Personal Gemini Key (optional)
-                                     </label>
-                                     {hasApiKey() && (
-                                         <span className="text-[7px] font-mono text-green-500 uppercase">active</span>
-                                     )}
-                                 </div>
-                                 <input
-                                     type="password"
-                                     value={geminiApiKey}
-                                     onChange={(e) => {
-                                         const value = e.target.value;
-                                         setGeminiApiKey(value);
-                                         setApiKey(value);
-                                     }}
-                                     placeholder="Optional personal key or comma-separated key pool"
-                                     className="w-full bg-neutral-900 border border-radio-dim/40 rounded px-2 py-1 text-[9px] font-mono text-gray-200 placeholder:text-gray-600 focus:outline-none focus:border-radio-lit/60"
-                                 />
-                                 <p className="text-[7.5px] text-gray-500 font-mono leading-relaxed">
-                                     The server provides AI music and voice. Optional personal keys join its pool for your requests and are saved in this browser. Keys from the same Google project share quota.
-                                 </p>
-                             </div>
-                         </div>
-                     </div>
-                  </div>
-                )}
-
-                <div className="flex-grow flex flex-col justify-center gap-4">
-                    <Clock className="mb-2" isAlarmActive={isAnyAlarmActive} />
-                    
-                    {/* TUNED SEARCH TRACK RETRO DISPLAY: Displays discovered song context */}
-                    {state.searchedTrack ? (
-                      <div className="bg-amber-950/25 border border-amber-500/20 p-3 rounded-lg flex flex-col text-left relative animate-[fadeIn_0.5s_ease-out] shadow-inner mb-2">
-                         <div className="flex justify-between items-center pb-1 border-b border-amber-500/10 mb-1.5">
-                            <span className="text-[8px] text-yellow-500 font-bold uppercase tracking-widest flex items-center gap-1.5">
-                              <Radio className="w-2.5 h-2.5 text-radio-lit" /> Selected Track
-                            </span>
-                            <span className="text-[7.5px] font-digital text-radio-lit led-text-shadow">
-                              STATION {getStationFreq(state.genrePreset)} MHz
-                            </span>
-                         </div>
-                         <div className="text-radio-lit text-xs sm:text-sm font-bold truncate tracking-wider led-text-shadow uppercase flex items-center gap-1">
-                           {(state.playlist[state.currentTrackIndex] || state.searchedTrack).title} <span className="text-gray-500 text-[10px] font-normal font-mono normal-case">by</span> {(state.playlist[state.currentTrackIndex] || state.searchedTrack).artist}
-                         </div>
-                         
-                         <p className="text-[9.5px] sm:text-[10.5px] text-amber-500/80 font-mono leading-normal mt-1 italic pl-1 border-l-2 border-red-500/30">
-                           "{(state.playlist[state.currentTrackIndex] || state.searchedTrack).whyExplanation}"
-                         </p>
-                         
-                         <div className="flex justify-between items-center text-[7.5px] text-gray-500 font-mono tracking-wider mt-2 pt-1 border-t border-amber-500/5">
-                            <span>Preset Theme: {state.searchedTrack.foundTheme}</span>
-                            <span>Aesthetic: {state.searchedTrack.styleDescription.substring(0, 32)}</span>
-                         </div>
-                      </div>
-                    ) : (
-                      /* Fallback Idle / Scanning frequency tuner view */
-                      <div className="bg-black/30 border border-white/5 p-3 rounded-lg flex items-center justify-between font-mono mb-2">
-                        <div className="flex flex-col text-left gap-0.5">
-                          <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1"><Compass className="w-2.5 h-2.5 animate-spin-slow" /> Tuner State</span>
-                          <span className="text-xs font-digital text-radio-lit/50 uppercase tracking-widest led-text-shadow">
-                            {state.status === 'generating_prompt' ? 'TUNING STATION...' : getStationName(state.genrePreset)}
-                          </span>
-                        </div>
-                        <div className="text-right flex flex-col gap-0.5">
-                          <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest block">Band frequency</span>
-                          <span className="text-sm font-digital text-radio-lit/70 led-text-shadow">
-                            {state.status === 'generating_prompt' ? 'SCAN...' : `${getStationFreq(state.genrePreset)} MHz`}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Playlist Viewer */}
-                    {state.playlist.length > 0 && ['ready', 'generating_prompt', 'generating_briefing', 'playing_briefing', 'playing'].includes(state.status) && (
-                      <PlaylistViewer
-                        playlist={state.playlist}
-                        currentIndex={state.currentTrackIndex}
-                        onNext={handleNextTrack}
-                        onPrev={handlePrevTrack}
-                        isPlayingBriefing={state.status === 'playing_briefing'}
-                      />
-                    )}
-
-                    {(playbackError || playbackNotice || localFallbackActive) && (
-                      <div role="status" className="rounded border border-amber-500/30 bg-black/40 p-3 text-sm text-amber-200">
-                        <p>{localFallbackActive ? 'Local alarm sound is playing. Press STOP to end it.' : playbackError || playbackNotice}</p>
-                        {playbackError && <div className="flex flex-wrap gap-3 mt-2">
-                          <button type="button" className="underline" onClick={() => {
-                            setPlaybackError(null);
-                            setLocalFallbackActive(false);
-                            stopOfflineFallback();
-                            failedVideoIdsRef.current.clear();
-                            setPlayerAttempt(attempt => attempt + 1);
-                          }}>Retry YouTube</button>
-                          <button type="button" className="underline" onClick={() => {
-                            ttsPlayerRef.current.stop();
-                            youtubePlayerRef.current?.stopVideo?.();
-                            setLocalFallbackActive(true);
-                            void playOfflineFallback();
-                          }}>Play local alarm sound</button>
-                        </div>}
-                      </div>
-                    )}
-                    {state.playlist.length > 0 && <a
-                      className="text-xs text-radio-lit underline py-2 inline-block"
-                      href={`https://www.youtube.com/watch?v=${state.playlist[state.currentTrackIndex]?.youtubeVideoId || ''}`}
-                      target="_blank" rel="noopener noreferrer"
-                    >Open this track on YouTube ↗</a>}
-
-                    {/* Visualizer and Stream Progress */}
-                    <div id="visualizer-slot" className={`relative transition-all duration-500 ease-in-out ${(state.status === 'playing' || state.status === 'playing_briefing') ? 'h-[240px] sm:h-[280px]' : 'h-24'}`}>
-                        {(state.status === 'playing' || state.status === 'playing_briefing') ? (
-                          <div 
-                            className="w-full h-full relative rounded overflow-hidden border-2 border-white/10 shadow-inset-screen pointer-events-auto transition-opacity duration-1000"
-                            style={{ opacity: state.status === 'playing' ? 1 : 0.3 }}
-                          >
-                            {state.playlist[state.currentTrackIndex]?.youtubeVideoId && (
-                              <YouTubePlayer
-                                key={playerAttempt}
-                                videoId={state.playlist[state.currentTrackIndex].youtubeVideoId!}
-                                playing={state.status === 'playing' && !localFallbackActive && !playbackError}
-                                volume={loudnessMode === 'max_impact' ? 100 : loudnessMode === 'sunrise_progressive' ? Math.min(10, volume) : volume}
-                                onPlayer={(player) => { youtubePlayerRef.current = player; }}
-                                onEnded={() => handleNextTrackRef.current()}
-                                onError={handleYouTubeError}
-                                onBlocked={() => setIsAutoplayBlocked(true)}
-                                onPlaying={() => { setIsAutoplayBlocked(false); setPlaybackError(null); }}
-                                onStatus={setVideoStatus}
-                              />
-                            )}
-                          </div>
-                        ) : (
-                          <div className="w-full h-full relative">
-                            <Visualizer 
-                              analyser={null} 
-                              isActive={false} 
-                              status={state.status} 
-                              genre={state.genrePreset}
-                            />
-                          </div>
-                        )}
-                    </div>
-
-
-                </div>
-            </div>
-
-            <CalendarPlanner items={state.calendar} onChange={syncCalendarToAgenda} onPreview={(id) => handleGenerateAndPlayRef.current(`task:${id}`)} />
-            {calendarStorageError && <p role="alert" className="text-sm text-red-300">Tasks could not be saved on this device. Check browser storage settings before closing the app.</p>}
-            <div className="rounded border border-radio-lit/30 bg-black/30 p-3 text-sm" aria-label="Next task music context">
-              {nextMusicContext.focus ? <>
-                <p className="text-radio-lit">Next task alarm: {nextMusicContext.focus.time} — {nextMusicContext.focus.title}</p>
-                <p className="text-gray-300">{nextMusicContext.focus.vibe || 'general'}{nextMusicContext.focus.keywords?.length ? ` · ${nextMusicContext.focus.keywords.join(' · ')}` : ''}</p>
-                <p className="text-xs text-gray-400 mt-1">{nextMusicContext.direction}</p>
-              </> : <p className="text-gray-400">Add and arm a task to wake up to music that fits what is coming next.</p>}
-            </div>
-
-            {/* MECHANICAL RADIO PRESET DIAL BOARD (The Genre Stations) */}
-            <div id="radio-station-pushed-dials" className="flex flex-col gap-1.5 p-3 bg-neutral-900/60 rounded border border-white/5 self-stretch">
-                <div className="flex justify-between items-center mb-2">
-                   <span className="text-[9px] font-mono text-radio-dim uppercase tracking-widest pl-1 flex items-center gap-1">
-                      <Sliders className="w-3 h-3 text-red-500/60" /> Preset Tuner Station Presets (Freq Select)
-                   </span>
-
-                </div>
-                
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                   {(['auto', 'rock', 'classical', 'jazz', 'pop', 'ambient', 'hiphop', 'lofi', 'acoustic', 'synthwave'] as MusicGenre[]).map((station) => {
-                       const active = state.genrePreset === station;
-                       return (
-                          <button
-                             key={station}
-                             type="button"
-                             onClick={() => {
-                                setState(prev => ({ 
-                                  ...prev, 
-                                  genrePreset: station,
-                                  searchedTrack: null,
-                                  playlist: [],
-                                  currentTrackIndex: 0
-                                }));
-                             }}
-                             className={`btn-spring p-2 rounded font-mono text-[9px] font-bold uppercase border tracking-wider relative overflow-hidden flex flex-col items-center gap-1
-                                ${active 
-                                  ? 'bg-neutral-800 border-radio-lit/80 text-radio-lit shadow-[inset_0_2px_4px_rgba(0,0,0,0.8),0_0_8px_rgba(255,51,51,0.2)] led-text-shadow' 
-                                  : 'bg-neutral-800/40 border-white/5 text-gray-500 hover:text-gray-300 hover:bg-neutral-850 shadow-btn hover:border-white/10'
-                                }
-                             `}
-                          >
-                             {/* Indicator Lamp */}
-                             <div className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-radio-lit led-warm-up' : 'bg-black opacity-30'}`} style={{ color: 'var(--radio-lit)' }}></div>
-                             
-                             <span className="text-[8px] leading-none mb-0.5">{station}</span>
-                             <span className="text-[7px] text-gray-600 block leading-none font-digital font-medium">{getStationFreq(station)}</span>
-                          </button>
-                       );
-                   })}
-                </div>
-            </div>
-
-            <YouTubeInput onPlay={(videoId) => {
-              pendingTaskAlarmRef.current = null;
-              generationEpochRef.current++;
-              ttsPlayerRef.current.stop();
-              stopOfflineFallback();
-              failedVideoIdsRef.current.clear();
-              setPlaybackError(null);
-              setPlaybackNotice('Playing your YouTube selection. AI curation and voice briefing are skipped.');
-              setIsAutoplayBlocked(false);
-              setLocalFallbackActive(false);
-              setPlayerAttempt(attempt => attempt + 1);
-              const track = { title: 'Your YouTube selection', artist: 'YouTube', youtubeVideoId: videoId, embedUrl: buildEmbedUrl(videoId)!, whyExplanation: 'Selected directly by you.' };
-              setState(prev => ({ ...prev, status: 'playing', playlist: [track], currentTrackIndex: 0,
-                currentAlarmId: null, generatedForAlarmId: null, briefingAudioSrc: null, youtubeEmbedUrl: track.embedUrl,
-                searchedTrack: { ...track, foundTheme: 'Your choice', styleDescription: 'Direct YouTube playback' } }));
-            }} />
-
-            {/* Bottom: Control Deck */}
-            <div id="btn-con-deck" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mt-auto">
-                {/* Next Alarm Summary */}
-                <div
-                    id="deck-next-alarm"
-                    className="col-span-1 sm:col-span-3 bg-radio-btn rounded shadow-btn active:shadow-btn-pressed transition-all relative overflow-hidden group border-t border-white/5 p-3 flex flex-col justify-center"
-                >
-                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-wider">Next Broadcast</span>
-                    <span className="text-sm sm:text-base font-mono text-radio-lit uppercase tracking-wider truncate led-text-shadow">
-                        {getAlarmStatusText(effectiveAlarms)}
-                    </span>
-                </div>
-
-                {/* Big Action Render Button */}
-                <button
-                   id="deck-btn-play"
-                   onClick={() => {
-                     if (state.status !== 'idle' && state.status !== 'error') {
-                        pendingTaskAlarmRef.current = null;
-                        generationEpochRef.current++;
-                        ttsPlayerRef.current.stop();
-                        stopOfflineFallback();
-                        if (youtubePlayerRef.current && typeof youtubePlayerRef.current.stopVideo === 'function') {
-                          youtubePlayerRef.current.stopVideo();
-                        }
-                        setPlaybackError(null);
-                        setPlaybackNotice(null);
-                        setLocalFallbackActive(false);
-                        setState(prev => ({ ...prev, status: 'idle', currentAlarmId: null }));
-                     } else {
-                        handleGenerateAndPlay();
-                     }
-                   }}
-                   className={`btn-spring col-span-1 rounded shadow-btn active:shadow-btn-pressed flex flex-col items-center justify-center p-2 border-t border-white/5 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-radio-lit focus-visible:ring-inset`}
-                   aria-label={state.status === 'playing' || state.status === 'playing_briefing' ? 'Stop Tuner' : state.status === 'idle' || state.status === 'error' ? 'Generate broadcast' : 'Cancel broadcast preparation'}
-                >
-                   {state.status === 'playing' || state.status === 'playing_briefing' ? (
-                      <Power className="w-5 h-5 text-red-500 mb-1 drop-shadow-[0_0_3px_rgba(239,68,68,0.5)]" />
-                   ) : state.status !== 'idle' && state.status !== 'error' ? (
-                      <Loader2 className="w-5 h-5 text-yellow-500 animate-spin mb-1" />
-                   ) : (
-                      <Play className="w-5 h-5 text-green-500 mb-1 drop-shadow-[0_0_3px_rgba(34,197,94,0.5)]" />
-                   )}
-                   <span className="text-[8px] font-bold text-gray-300 uppercase">
-                      {state.status === 'playing' || state.status === 'playing_briefing' ? 'STOP' : state.status === 'idle' || state.status === 'error' ? 'TUNE IN' : 'CANCEL'}
-                   </span>
-                </button>
-            </div>
-
-         </div>
-
-      </div>
-
-
-
-      {/* Weather service attribution */}
-      {state.weather && (
-        <a 
-          href="https://open-meteo.com/" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="absolute bottom-2 right-4 text-[10px] text-white/20 font-mono hover:text-white/50 transition-colors z-0"
-        >
-          Weather data by Open-Meteo
-        </a>
-      )}
-
-      <PWAInstallPrompt />
-
-      {/* Screen Saver Overlay */}
-      {isScreenSaverActive && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center gap-6 cursor-pointer transition-opacity duration-700"
-          onClick={() => setIsScreenSaverActive(false)}
-        >
-          <div className="text-center">
-            <Clock isAlarmActive={isAnyAlarmActive} />
-            {isAnyAlarmActive && (
-              <div className="mt-4 flex items-center justify-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-radio-lit animate-pulse shadow-[0_0_8px_rgba(255,51,51,0.8)]" />
-                <span className="text-radio-lit font-mono text-xs uppercase tracking-widest">Alarm Armed</span>
-              </div>
-            )}
-          </div>
-          <span className="text-gray-600 font-mono text-[10px] uppercase tracking-widest animate-pulse">
-            Tap to wake
-          </span>
-        </div>
-      )}
-
-      {/* Autoplay Unlock Overlay */}
-      {isAutoplayBlocked && (
-        <div 
-          role="dialog" aria-label="Start audio playback"
-          className="fixed inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center gap-4"
-        >
-          <p className="text-white text-center px-6">Your browser requires a tap before it can play audio.</p>
-          <button type="button" className="rounded bg-radio-lit px-6 py-3 text-black font-bold" onClick={() => {
-            youtubePlayerRef.current?.playVideo?.();
-            setIsAutoplayBlocked(false);
-          }}>Start playback</button>
-          <button type="button" className="text-gray-300 underline" onClick={() => setIsAutoplayBlocked(false)}>Back to player</button>
-        </div>
-      )}
-    </div>
-  );
+  return <AetherClockInterface
+    state={state}
+    effectiveAlarms={effectiveAlarms}
+    now={clockNow}
+    nextAlarm={nextAlarm}
+    nextMusicContext={nextMusicContext}
+    activeView={activeView}
+    onViewChange={setActiveView}
+    theme={activeTheme}
+    globalThemeId={currentTheme}
+    visualSettings={visualSettings}
+    onVisualSettingsChange={setVisualSettings}
+    onSelectTheme={handleSelectTheme}
+    reducedMotion={reducedMotion}
+    circadian={circadian}
+    isSettingsOpen={isSettingsOpen}
+    onSettingsOpenChange={setIsSettingsOpen}
+    isAnyAlarmActive={isAnyAlarmActive}
+    isOnlineStatus={isOnlineStatus}
+    isScreenSaverActive={isScreenSaverActive}
+    onScreenSaverWake={() => setIsScreenSaverActive(false)}
+    volume={volume}
+    onVolumeChange={value => { setVolume(value); localStorage.setItem('aetherclock_volume', String(value)); }}
+    loudnessMode={loudnessMode}
+    onLoudnessModeChange={value => { setLoudnessMode(value); localStorage.setItem('aetherclock_loudness', value); }}
+    blacklist={blacklist}
+    onBlacklistChange={value => { setBlacklist(value); localStorage.setItem('aetherclock_blacklist', value); }}
+    isPreWarmEnabled={isPreWarmEnabled}
+    onPreWarmChange={value => { setIsPreWarmEnabled(value); localStorage.setItem('aetherclock_prewarm', String(value)); }}
+    voiceBriefingConfig={voiceBriefingConfig}
+    onVoiceBriefingConfigChange={value => { setVoiceBriefingConfig(value); localStorage.setItem('aetherclock_voice_briefing', JSON.stringify(value)); }}
+    playlistConfig={playlistConfig}
+    onPlaylistConfigChange={value => { setPlaylistConfig(value); localStorage.setItem('aetherclock_playlist', JSON.stringify(value)); }}
+    llmConfig={llmConfig}
+    onLLMConfigChange={value => { setLLMConfig(value); localStorage.setItem('aetherclock_llm', JSON.stringify(value)); }}
+    notificationsEnabled={notificationsEnabled}
+    onNotificationsChange={value => { void handleNotificationsChange(value); }}
+    offlineFallbackEnabled={offlineFallbackEnabled}
+    onOfflineFallbackChange={value => { setOfflineFallbackEnabled(value); localStorage.setItem('aetherclock_offline_fallback', String(value)); }}
+    screenSaverTimeout={screenSaverTimeout}
+    onScreenSaverTimeoutChange={value => { setScreenSaverTimeout(value); localStorage.setItem('aetherclock_screensaver_timeout', String(value)); }}
+    geminiApiKey={geminiApiKey}
+    onGeminiApiKeyChange={value => { setGeminiApiKey(value); setApiKey(value); }}
+    hasPersonalApiKey={hasApiKey()}
+    onAlarmsChange={alarms => setState(prev => ({ ...prev, alarms }))}
+    onCalendarChange={syncCalendarToAgenda}
+    onPreviewTask={id => handleGenerateAndPlayRef.current(`task:${id}`)}
+    onGenerateAndPlay={alarmId => { void handleGenerateAndPlay(alarmId); }}
+    onPlayToggle={handlePlayToggle}
+    onNextTrack={handleNextTrack}
+    onPrevTrack={handlePrevTrack}
+    onGenreChange={handleGenreChange}
+    onYouTubePlay={handleYouTubeSelection}
+    onYouTubeError={handleYouTubeError}
+    onPlayer={player => { youtubePlayerRef.current = player; }}
+    playerAttempt={playerAttempt}
+    playbackError={playbackError}
+    playbackNotice={playbackNotice}
+    localFallbackActive={localFallbackActive}
+    isAutoplayBlocked={isAutoplayBlocked}
+    videoStatus={videoStatus}
+    onVideoStatus={setVideoStatus}
+    onPlaybackBlocked={() => setIsAutoplayBlocked(true)}
+    onPlaybackPlaying={() => { setIsAutoplayBlocked(false); setPlaybackError(null); }}
+    onRetryYouTube={handleRetryYouTube}
+    onPlayLocalAlarm={handlePlayLocalAlarm}
+    onUnlockAutoplay={() => { youtubePlayerRef.current?.playVideo?.(); setIsAutoplayBlocked(false); }}
+    onDismissAutoplay={() => setIsAutoplayBlocked(false)}
+    calendarStorageError={calendarStorageError}
+    getStationName={getStationName}
+    getStationFreq={getStationFreq}
+  />;
 };
 
 export default App;

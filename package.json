@@ -36,6 +36,6 @@
     "vite": "^6.2.0",
     "vitest": "^4.1.8",
     "web-push-neo": "^0.1.2",
-    "wrangler": "^4.100.0"
+    "wrangler": "4.100.0"
   }
 }

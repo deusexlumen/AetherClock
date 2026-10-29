@@ -9,9 +9,7 @@
 A task-based AI radio alarm clock that gives what's next its own soundtrack.
 
 [![Live Demo](https://img.shields.io/badge/🔗_Live_Demo-pages.dev-FF6B6B?style=for-the-badge)](https://aetherclock.pages.dev)
-
 <br>
-
 [![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?logo=vite)](https://vitejs.dev)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org)
@@ -22,81 +20,59 @@ A task-based AI radio alarm clock that gives what's next its own soundtrack.
 
 </div>
 
----
-
 ## ✨ What is AetherClock?
 
 **AetherClock** turns daily tasks into music alarms. Add a task with a time, category and mood keywords. At that time, an active task starts a broadcast whose music is selected for the activity:
 
 1. 🗓️ **Task Alarms** — Each active task triggers at its own time; edits and deactivation update the alarm
-2. 📻 **Task-Based Playlist** — Category and keywords guide the selection: focus/no vocals for a meeting, energy for training, calm for winding down
-3. 🎙️ **Optional Voice Briefing** — A synthetic voice introduces the upcoming tasks, time and weather
-4. 🎨 **Immersive Visuals** — 10 retro chassis themes, 3 with live WebGL backgrounds
+2. 📻 **Task-Based Playlist** — Category and keywords guide the selection
+3. 🎙️ **Optional Voice Briefing** — A synthetic voice introduces upcoming tasks, time and weather
+4. 🎨 **Immersive Visuals** — 14 neo-retro themes, Device/Ambient modes and 3 live WebGL backgrounds
 5. 📲 **PWA** — Install it, get push notifications, and use a local alarm sound offline
 
 > *"It's like having a radio station that only plays for you, every morning."*
-
----
 
 ## 🚀 Live Demo
 
 **→ [https://aetherclock.pages.dev](https://aetherclock.pages.dev)**
 
-Open it in your browser and use **Play your own YouTube link** to test playback without a key. AI curation and voice briefings use the server-side Gemini pool. You may optionally add personal keys in settings. Music playback requires the app to remain open; background push notifications do not automatically start music in a closed app.
-
----
+Open it in your browser and use **Play your own YouTube link** to test playback without a key. AI curation and voice briefings use the server-side Gemini pool. Music playback requires the app to remain open; background push notifications do not automatically start music in a closed app.
 
 ## 🎬 Features in Detail
 
 ### 🗓️ Task alarms
-Tasks store their time, category, keywords and armed state in this browser. **Test music** previews a task's selection immediately. The text-list editor preserves categories and keywords, including disabled tasks. Tasks currently form a repeating daily plan, not a dated calendar. Tasks at the same time share one broadcast with their combined context. Additional standalone alarms remain available in settings.
+Tasks store their time, category, keywords and armed state in this browser. **Test music** previews a task's selection immediately. The text-list editor preserves categories and keywords, including disabled tasks. Tasks form a repeating daily plan, not a dated calendar. Tasks at the same time share one broadcast with their combined context. Additional standalone alarms remain available.
 
-The selected task is supplied explicitly to the AI; its keywords take priority over generic time-of-day or weather suggestions. A configured server-side Gemini pool or a personal key is required for semantic music selection. If AI is unavailable, the app clearly labels the generic preset fallback. See [task alarm validation](docs/task-alarms.md).
+The selected task is supplied explicitly to the AI; its keywords take priority over generic suggestions. If AI is unavailable, the app clearly labels the generic preset fallback. See [task alarm validation](docs/task-alarms.md).
 
 ### 🎙️ AI Voice Briefing
-Wake up to a personalized spoken briefing synthesized via Google Gemini TTS. Choose from three voices:
-- **`Fenrir`** — Deep, commanding male
-- **`Kore`** — Clear, bright female  
-- **`Leda`** — Warm, soothing female
-
-The briefing covers:
-- ⏰ Current time
-- 🌤️ Weather conditions & temperature (via GPS + Open-Meteo)
-- 📅 Your upcoming calendar appointments
-- 💬 A custom greeting of your choice
+Choose from **Fenrir**, **Kore** and **Leda**. The briefing can cover current time, weather, upcoming appointments and a custom greeting.
 
 ### 📻 Smart Playlist Curation
-Instead of one alarm tone, AetherClock builds a **1–5 track YouTube playlist** in real-time, considering:
+AetherClock builds a **1–5 track YouTube playlist** using task context, weather, time and genre. With a Gemini key, **Google Search grounding** helps select existing recordings. The app does not synthesize music. A valid video ID does not guarantee availability: YouTube can restrict embedding, regions, accounts or autoplay. The player reports failures, tries replacement tracks, and offers a local alarm sound.
 
-| Context | Music Adaptation |
-|---------|-----------------|
-| ☀️ Sunny weather | Upbeat, energetic tracks |
-| 🌧️ Rainy weather | Lo-fi, ambient, acoustic |
-| 💼 Morning meetings | Focus, instrumental |
-| 🏋️ Workout scheduled | High-energy rock / electronic |
-| 🌙 Night shift | Mellow jazz, chillhop |
-| 🎚️ Genre preset | Synthwave, Classical, Rock, Jazz, Pop, Ambient, Hip-Hop |
+### 🎨 14 Neo-Retro Themes (3 with Live WebGL)
 
-With a Gemini key, **Google Search grounding** helps select existing YouTube recordings. The app does not synthesize music or change the recording's lyrics. A valid video ID does not guarantee availability: YouTube can restrict embedding, regions, accounts or autoplay. The player reports failures, tries at most two replacement tracks, and offers a local alarm sound. If the AI service is unavailable, the app clearly labels preset tracks and skips the voice briefing.
-
-### 🎨 10 Retro Themes (3 with Live WebGL)
-
-Every theme morphs the entire UI — colors, glows, scanlines, hardware decals, and typography.
+Every theme morphs the entire UI — colors, glows, hardware details and motion. Device Mode keeps the full radio; Ambient Mode expands the display into an immersive clock. A visual gallery provides lightweight animated previews, favorites, daily/per-alarm rotation and optional per-alarm theme overrides.
 
 | Theme | Vibe | Background Engine |
 |-------|------|-------------------|
 | Obsidian Cyberpunk | Red neon, dystopian | CSS gradients + shadows |
 | Sandalwood Amber | Warm, vintage wood | CSS gradients |
 | Futuristic Cobalt | Blue tech, clean | CSS gradients |
-| **★ Vaporwave Cyber-Luxe** | Purple & magenta, retro sun | 🌴 **WebGL** — animated grid floor, rotating sun, post-processing bloom |
+| **★ Vaporwave Cyber-Luxe** | Purple & magenta, retro sun | 🌴 **WebGL** — grid, rotating sun and halo, bloom |
 | **★ Antique Mahogany Brass** | Brass screws, wood grain | CSS gradients + rivet decals |
 | **★ Reactor Toxic-Green** | Biohazard stripes, warning labels | CSS gradients + hazard patterns |
-| **★ Space Odyssey** | Deep space, orbital ring, planet | 🌌 **WebGL** — 3,000 star particles, rotating torus, nebula lighting |
+| **★ Space Odyssey** | Deep space, orbital ring, planet | 🌌 **WebGL** — stars, satellite, rotating torus, nebula light |
 | **★ Royal Velvet** | Gold filigree, crown accents | CSS gradients + border inlays |
-| **★ Sonar Marine** | Green radar, depth readouts | 🛸 **WebGL** — sonar ping rings, rising bubbles, depth fog |
+| **★ Sonar Marine** | Green radar, depth readouts | 🛸 **WebGL** — dual sonar ping, bubbles, depth fog |
 | Ivory Coast Emerald | Light mode, clean emerald | CSS gradients |
+| Neon Nocturne | Night-drive instrumentation | Layered CSS light trails + analog meters |
+| Solaris Console | Warm daylight console | Layered CSS light + circadian response |
+| Art Deco Broadcast | Geometric brass broadcast | CSS ornament + machined details |
+| Aurora Field | Atmospheric field receiver | Layered CSS aurora + minimal radio frame |
 
-> **WebGL themes** use Babylon.js with real-time FFT audio reactivity (when playing non-YouTube audio).
+> **WebGL themes** use Babylon.js with real-time FFT audio reactivity when the audio source exposes it. Motion, speed, glow, particle density and quality are adjustable. Reduced-motion and CSS fallbacks remain available.
 
 ### 📲 Progressive Web App
 
@@ -108,21 +84,15 @@ Every theme morphs the entire UI — colors, glows, scanlines, hardware decals, 
 | ⚡ Service Worker asset caching | ✅ |
 | 📴 Works without internet after install | ✅ (fallback tone) |
 
----
-
 ## 🛠️ Architecture
 
-The React PWA stores tasks and settings in the browser, plays YouTube videos, and uses a service worker for caching and the offline fallback tone. Weather comes from Open-Meteo; location access is optional.
-
-AI requests go through the same-origin `/api/generate` Cloudflare Pages Function. The server contacts Gemini using its configured key pool or an optional personal key supplied with the request. Background push alarms additionally use Pages Functions, KV, D1 and a scheduled Worker. See [AI routing](docs/ai-routing.md) and [push alarm setup](docs/kv-quota-fix.md).
-
----
+The React PWA stores tasks and settings in the browser, plays YouTube videos, and uses a service worker for caching and the offline fallback tone. Weather comes from Open-Meteo; location access is optional. AI requests go through the same-origin `/api/generate` Cloudflare Pages Function. Background push alarms additionally use Pages Functions, KV, D1 and a scheduled Worker. See [AI routing](docs/ai-routing.md) and [push alarm setup](docs/kv-quota-fix.md).
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - [Node.js](https://nodejs.org) 22 or later and pnpm
-- A [Google Gemini API key](https://aistudio.google.com/app/apikey) for AI features; quota and availability depend on your account
+- A [Google Gemini API key](https://aistudio.google.com/app/apikey) for AI features
 
 ### 1. Clone & Install
 ```bash
@@ -132,7 +102,7 @@ pnpm install --frozen-lockfile
 ```
 
 ### 2. Configure AI
-Configure `GEMINI_API_KEY` and optionally `GEMINI_API_KEYS` as Cloudflare Pages secrets (or in an ignored `.dev.vars` for local Pages development). Never use Vite variables for secrets. Run the D1 migrations, build with `pnpm build`, then run `pnpm dev:pages`; plain Vite preview does not serve the AI endpoint. Optional personal keys remain in browser storage and are sent to the server for each request, without server persistence. See [key-pool routing](docs/ai-routing.md).
+Configure `GEMINI_API_KEY` and optionally `GEMINI_API_KEYS` as Cloudflare Pages secrets. Run the D1 migrations, build with `pnpm build`, then run `pnpm dev:pages`; plain Vite preview does not serve the AI endpoint. Optional personal keys remain in browser storage and are sent to the server for each request, without server persistence.
 
 ### 3. Develop
 ```bash
@@ -144,9 +114,7 @@ pnpm dev
 ```bash
 pnpm build
 ```
-→ Outputs static assets to `dist/`. Background push alarms also require the Cloudflare Functions, bindings and scheduled Worker described in `docs/kv-quota-fix.md`.
-
----
+→ Outputs static assets to `dist/`. Background push alarms also require the Cloudflare Functions, bindings and scheduled Worker.
 
 ## 🎛️ Settings & Customization
 
@@ -154,64 +122,48 @@ All preferences are persisted in `localStorage` and survive reloads.
 
 | Category | Options |
 |----------|---------|
-| **Voice Briefing** | On/Off, voice (`Fenrir`/`Kore`/`Leda`), custom greeting, include weather/agenda/time |
-| **Playlist** | On/Off, track count (1–5), shuffle; up to three AI selections, with preset tracks filling larger queues |
-| **Loudness** | Standard · Sunrise Progressive (gentle ramp) · Max Impact Shock |
+| **Voice Briefing** | On/Off, voice, custom greeting, include weather/agenda/time |
+| **Playlist** | On/Off, track count (1–5), shuffle |
+| **Loudness** | Standard · Sunrise Progressive · Max Impact Shock |
 | **Pre-Warm Engine** | Generates content 60s before alarm time |
-| **Playback Source** | Your YouTube link, AI selections, or preset NCS tracks; availability is checked by the player |
-| **Theme** | 10 visual presets |
+| **Playback Source** | Your YouTube link, AI selections, or preset NCS tracks |
+| **Theme** | 14 visual presets, favorites, daily/per-alarm rotation, per-alarm override |
+| **Display & Motion** | Device/Ambient, motion intensity/speed, audio response, glow, particles, quality, reduced motion, circadian light |
 | **Blacklist** | Comma-separated artists/keywords to avoid |
 | **Notifications** | System push notifications on alarm trigger |
 | **Offline Fallback** | Local synthesized tone when disconnected |
 
----
-
 ## 📱 PWA Installation
 
-### Android / Chrome Desktop
-1. Open [aetherclock.pages.dev](https://aetherclock.pages.dev) in Chrome
-2. Tap **"Install AetherClock"** in the banner (or ⋮ → Install)
-3. App appears on home screen / desktop — runs standalone, no browser chrome
-
-### Enable Notifications
-1. Open **Settings** panel in the app
-2. Toggle **Push Notifications**
-3. Grant browser permission
-4. Receive system notifications when supported by your browser and operating system. Tap a notification to open the app; background delivery does not bypass autoplay restrictions.
-
----
+Open [aetherclock.pages.dev](https://aetherclock.pages.dev) in Chrome and tap **Install AetherClock**. Enable **Push Notifications** in Settings and grant browser permission. Background delivery does not bypass autoplay restrictions.
 
 ## 🗺️ Roadmap
 
-- [x] AI Studio decoupling (standalone deployment)
+- [x] AI Studio decoupling
 - [x] YouTube-first playback engine
-- [x] Smart playlist curation (1–5 tracks)
-- [x] Voice briefing (Gemini TTS)
+- [x] Smart playlist curation
+- [x] Voice briefing
 - [x] PWA + Service Worker + offline fallback
 - [x] Push notifications
-- [x] Babylon.js WebGL animated themes (Vaporwave, Space, Submarine)
-- [x] 10 retro chassis presets
+- [x] Babylon.js WebGL animated themes
+- [x] 14 neo-retro themes with Device/Ambient modes
 - [ ] Custom user-uploaded alarm tones
 - [ ] Spotify / Apple Music integration
-- [ ] Gamified wake-up challenges (snooze limits, dismiss puzzles)
-
----
+- [ ] Gamified wake-up challenges
 
 ## 🧰 Tech Stack
 
 | Layer | Technology |
 |-------|------------|
-| Framework | React 19 (Hooks + Refs) |
+| Framework | React 19 |
 | Language | TypeScript 5.8 |
 | Build Tool | Vite 6 |
-| Styling | Tailwind CSS (CDN) + CSS Custom Properties |
+| Styling | Tailwind CSS + CSS Custom Properties |
 | Icons | Lucide React |
 | AI SDK | `@google/genai` |
 | 3D Engine | `@babylonjs/core` (WebGL2, lazy-loaded) |
-| Weather | Open-Meteo (free, no key) |
-| Fonts | Orbitron, Share Tech Mono (Google Fonts) |
-
----
+| Weather | Open-Meteo |
+| Fonts | Orbitron & Share Tech Mono |
 
 ## 🤝 Credits
 
@@ -221,13 +173,9 @@ All preferences are persisted in `localStorage` and survive reloads.
 - **3D Engine**: [Babylon.js](https://www.babylonjs.com/)
 - **Fonts**: Orbitron & Share Tech Mono via Google Fonts
 
----
-
 ## 📄 License
 
 MIT — feel free to fork, remix, and build your own wake-up experience.
-
----
 
 <div align="center">
 

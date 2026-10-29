@@ -1,0 +1,33 @@
+import type { AppState, Alarm, CalendarItem, LLMConfig, MusicGenre, PlaylistConfig, ThemeId, VisualSettings, VoiceBriefingConfig } from '../../types';
+import type { NextAlarmOccurrence } from '../../services/nextAlarm';
+import type { CircadianSnapshot } from '../../services/visualSettings';
+import type { ThemeDefinition } from '../themes/registry';
+export type AppView = 'now' | 'alarms' | 'tuner' | 'themes';
+export type Loudness = 'standard' | 'sunrise_progressive' | 'max_impact';
+export interface NeoRetroProps {
+  state: AppState; effectiveAlarms: Alarm[]; now: Date; nextAlarm: NextAlarmOccurrence | null;
+  nextMusicContext: ReturnType<typeof import('../../services/calendar').buildMusicContext>;
+  activeView: AppView; onViewChange: (view: AppView) => void;
+  theme: ThemeDefinition; globalThemeId: ThemeId; visualSettings: VisualSettings;
+  onVisualSettingsChange: (settings: VisualSettings) => void; onSelectTheme: (themeId: ThemeId) => void;
+  reducedMotion: boolean; circadian: CircadianSnapshot; isSettingsOpen: boolean; onSettingsOpenChange: (open: boolean) => void;
+  isAnyAlarmActive: boolean; isOnlineStatus: boolean; isScreenSaverActive: boolean; onScreenSaverWake: () => void;
+  volume: number; onVolumeChange: (value: number) => void; loudnessMode: Loudness; onLoudnessModeChange: (value: Loudness) => void;
+  blacklist: string; onBlacklistChange: (value: string) => void; isPreWarmEnabled: boolean; onPreWarmChange: (value: boolean) => void;
+  voiceBriefingConfig: VoiceBriefingConfig; onVoiceBriefingConfigChange: (value: VoiceBriefingConfig) => void;
+  playlistConfig: PlaylistConfig; onPlaylistConfigChange: (value: PlaylistConfig) => void;
+  llmConfig: LLMConfig; onLLMConfigChange: (value: LLMConfig) => void;
+  notificationsEnabled: boolean; onNotificationsChange: (value: boolean) => void;
+  offlineFallbackEnabled: boolean; onOfflineFallbackChange: (value: boolean) => void;
+  screenSaverTimeout: number; onScreenSaverTimeoutChange: (value: number) => void;
+  geminiApiKey: string; onGeminiApiKeyChange: (value: string) => void; hasPersonalApiKey: boolean;
+  onAlarmsChange: (alarms: Alarm[]) => void; onCalendarChange: (items: CalendarItem[]) => void;
+  onPreviewTask: (id: string) => void; onGenerateAndPlay: (alarmId?: string) => void; onPlayToggle: () => void;
+  onNextTrack: () => void; onPrevTrack: () => void; onGenreChange: (genre: MusicGenre) => void;
+  onYouTubePlay: (videoId: string) => void; onYouTubeError: (code: number, message?: string) => void; onPlayer: (player: any) => void;
+  playerAttempt: number; playbackError: string | null; playbackNotice: string | null; localFallbackActive: boolean;
+  isAutoplayBlocked: boolean; videoStatus: string; onVideoStatus: (status: string) => void;
+  onPlaybackBlocked: () => void; onPlaybackPlaying: () => void; onRetryYouTube: () => void; onPlayLocalAlarm: () => void;
+  onUnlockAutoplay: () => void; onDismissAutoplay: () => void; calendarStorageError: boolean;
+  getStationName: (genre: MusicGenre) => string; getStationFreq: (genre: MusicGenre) => string;
+}
