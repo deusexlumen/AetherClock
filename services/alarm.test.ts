@@ -300,12 +300,19 @@ describe('loadAlarms / saveAlarms', () => {
   it('falls back to default when persisted alarm has an invalid voiceName', () => {
     const invalid = {
       ...createAlarm({ time: '08:00' }),
-      voiceBriefingConfig: { ...DEFAULT_VOICE_BRIEFING_CONFIG, voiceName: 'Odin' },
+      voiceBriefingConfig: { ...DEFAULT_VOICE_BRIEFING_CONFIG, voiceName: '../Odin' },
     };
     store['aetherclock_alarms'] = JSON.stringify([invalid]);
     const alarms = loadAlarms();
     expect(alarms).toHaveLength(1);
     expect(alarms[0].time).toBe('07:00');
+  });
+  it('preserves catalog voices and delivery controls when loading saved alarms', () => {
+    const alarm = createAlarm({ time: '08:00', voiceBriefingConfig: {
+      ...DEFAULT_VOICE_BRIEFING_CONFIG, voiceName: 'voice_arlo', delivery: { style: 'radio', pace: 75, expression: 80 },
+    } });
+    store['aetherclock_alarms'] = JSON.stringify([alarm]);
+    expect(loadAlarms()[0].voiceBriefingConfig).toEqual(alarm.voiceBriefingConfig);
   });
 
   it('falls back to default when persisted alarm has an invalid time', () => {

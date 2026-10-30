@@ -1,14 +1,14 @@
 import type { GenerateContentResponse } from '@google/genai';
 
 /** Use REST for the 3.8 schema, independently of the legacy text SDK. */
-export async function generateSpeech(model: string, apiKey: string, text: string, voice: string, timeout: number): Promise<GenerateContentResponse> {
+export async function generateSpeech(model: string, apiKey: string, text: string, voice: string, timeout: number, style = ''): Promise<GenerateContentResponse> {
   const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     signal: AbortSignal.timeout(timeout),
     body: JSON.stringify({
       model,
-      input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style: '' }] }] }],
+      input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }],
       response_format: { type: 'audio', mime_type: 'audio/wav' },
       generation_config: { speech_config: [{ voice }] },
     }),

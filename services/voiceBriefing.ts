@@ -56,7 +56,7 @@ export const generateVoiceBriefing = async (
           },
         },
       },
-    });
+    }, config.delivery);
 
     const part = response.candidates?.[0]?.content?.parts?.[0];
     const audioBase64 = part?.inlineData?.data || '';

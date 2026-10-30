@@ -4,6 +4,7 @@ import { AICapacityError, createKeyPoolRouter, resolveApiKeys } from '../_shared
 import { jsonResponse, errorResponse } from '../_shared/cors';
 import { TEXT_MODELS, VOICE_MODELS } from '../../services/aiModels';
 import { generateSpeech } from '../_shared/llm/speech';
+import { buildSpeechStyle, isVoiceId, STUDIO_VOICE_NAMES } from '../../services/voiceOptions';
 
 interface Env {
   GEMINI_API_KEY?: string;
@@ -117,11 +118,11 @@ export const onRequestPost: PagesFunction<Env> = async context => {
       const voiceName = incoming.config?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName;
       if (body.kind === 'voice' && model.startsWith('gemini-3.8-')) {
         return generateSpeech(model, apiKey, items.flatMap(item => item.parts.map((part: { text: string }) => part.text)).join(' '),
-          ['Fenrir', 'Kore', 'Leda'].includes(voiceName) ? voiceName : 'Kore', Math.min(12_000, remaining));
+          isVoiceId(voiceName) ? voiceName : 'Kore', Math.min(12_000, remaining), buildSpeechStyle(body.delivery));
       }
       const config = body.kind === 'voice' ? {
         responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ['Fenrir', 'Kore', 'Leda'].includes(voiceName) ? voiceName : 'Kore' } } },
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: STUDIO_VOICE_NAMES.includes(voiceName) ? voiceName : 'Kore' } } },
       } : { systemInstruction: grounded ? system : `${system || ''}\nGoogle Search is unavailable for this request. Choose only a familiar existing recording with a known YouTube ID. Do not claim to have searched or invent IDs. The server will reject missing videos or mismatched titles.`,
         responseMimeType: 'application/json', ...(grounded ? { tools: [{ googleSearch: {} }] } : {}), maxOutputTokens: 4096 };
       const params = { model, contents: items.map(item => ({ parts: item.parts.map((part: any) => ({ text: part.text })) })), config };

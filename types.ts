@@ -82,14 +82,15 @@ export type TTSModel = 'gemini-3.8-flash-tts' | 'gemini-3.8-flash-lite-tts' | 'g
 
 export interface VoiceBriefingConfig {
   enabled: boolean;
-  voiceName: 'Fenrir' | 'Kore' | 'Leda';
+  voiceName: string;
+  delivery?: import('./services/voiceOptions').VoiceDelivery;
   includeWeather: boolean;
   includeAgenda: boolean;
   includeTime: boolean;
   customGreeting: string;
 }
 
-export const VOICE_NAMES: readonly VoiceBriefingConfig['voiceName'][] = ['Fenrir', 'Kore', 'Leda'];
+export { STUDIO_VOICE_NAMES as VOICE_NAMES } from './services/voiceOptions';
 
 export interface LLMConfig {
   textModel: TextModel;

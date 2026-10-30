@@ -1,5 +1,5 @@
 // BUXE_OS v24.X -- TTS PLAYER
-const audioUrl = (source: string, mimeType: string): string => {
+export const audioUrl = (source: string, mimeType: string): string => {
   const match = source.match(/^data:(.+);base64,([\s\S]*)$/);
   const mime = match?.[1] || mimeType;
   const base64 = match?.[2] ?? source;

@@ -6,7 +6,8 @@
  * LAST_VALIDATED: 2026-06-13
  */
 
-import { Alarm, MusicGenre, MUSIC_GENRES, PlaylistConfig, VoiceBriefingConfig, VOICE_NAMES, WeekDay } from '../types';
+import { Alarm, MusicGenre, MUSIC_GENRES, PlaylistConfig, VoiceBriefingConfig, WeekDay } from '../types';
+import { isVoiceId } from './voiceOptions';
 
 export const DEFAULT_PLAYLIST_CONFIG: Readonly<PlaylistConfig> = Object.freeze({
   enabled: true,
@@ -190,7 +191,7 @@ const isValidAlarm = (value: unknown): value is Alarm => {
   if (typeof alarm.voiceBriefingConfig !== 'object' || alarm.voiceBriefingConfig === null) return false;
   const vc = alarm.voiceBriefingConfig as Record<string, unknown>;
   if (typeof vc.enabled !== 'boolean') return false;
-  if (!VOICE_NAMES.includes(vc.voiceName as VoiceBriefingConfig['voiceName'])) return false;
+  if (!isVoiceId(vc.voiceName)) return false;
   if (typeof vc.includeWeather !== 'boolean') return false;
   if (typeof vc.includeAgenda !== 'boolean') return false;
   if (typeof vc.includeTime !== 'boolean') return false;

@@ -230,3 +230,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .alarm-theme-select.is-compact { justify-content: flex-start; }
 .alarm-theme-select.is-compact > span { font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
 .alarm-theme-select.is-compact select { min-height: 30px; font-size: 10px; }
+.voice-controls { min-width: 0; }
+.voice-controls select, .voice-controls input { max-width: 100%; min-width: 0; }
+.voice-controls small { display: block; color: var(--radio-muted); font-size: 11px; line-height: 1.5; }
+.voice-preview-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0 10px; }
+.voice-preview-row button { min-height: 44px; }
+.voice-preview-row [role="status"] { color: var(--radio-muted); font-size: 11px; }
+.voice-controls [role="alert"] { color: var(--radio-lit); font-size: 12px; }
