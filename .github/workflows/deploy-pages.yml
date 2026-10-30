@@ -42,4 +42,4 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler pages deploy dist --project-name=aetherclock --branch=master --commit-hash="$GITHUB_SHA"
+        run: pnpm exec wrangler pages deploy dist --project-name=aetherclock --branch=main --commit-hash="$GITHUB_SHA"
