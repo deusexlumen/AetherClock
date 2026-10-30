@@ -159,11 +159,14 @@ const App: React.FC = () => {
   const [llmConfig, setLLMConfig] = useState<LLMConfig>(() => {
     try {
       const saved = localStorage.getItem('aetherclock_llm');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...parsed, ttsModel: !parsed.ttsModel || parsed.ttsModel === 'gemini-3.1-flash-tts-preview' ? 'gemini-3.8-flash-tts' : parsed.ttsModel };
+      }
     } catch {}
     return {
       textModel: TEXT_MODELS[0],
-      ttsModel: 'gemini-3.1-flash-tts-preview'
+      ttsModel: 'gemini-3.8-flash-tts'
     };
   });
 

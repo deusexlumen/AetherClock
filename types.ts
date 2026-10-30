@@ -78,7 +78,7 @@ export interface PlaylistTrack {
 }
 
 export type TextModel = 'gemini-3.5-flash' | 'gemini-3-flash' | 'gemini-3.1-flash-lite' | 'gemini-2.5-flash' | 'gemini-2.5-flash-lite' | 'gemini-2.5-pro';
-export type TTSModel = 'gemini-3.1-flash-tts-preview' | 'gemini-2.5-flash-tts' | 'gemini-2.5-pro-tts';
+export type TTSModel = 'gemini-3.8-flash-tts' | 'gemini-3.8-flash-lite-tts' | 'gemini-3.1-flash-tts-preview' | 'gemini-2.5-flash-tts' | 'gemini-2.5-pro-tts';
 
 export interface VoiceBriefingConfig {
   enabled: boolean;

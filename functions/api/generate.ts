@@ -3,6 +3,7 @@ import type { PagesFunction } from '@cloudflare/workers-types';
 import { AICapacityError, createKeyPoolRouter, resolveApiKeys } from '../_shared/llm/router';
 import { jsonResponse, errorResponse } from '../_shared/cors';
 import { TEXT_MODELS, VOICE_MODELS } from '../../services/aiModels';
+import { generateSpeech } from '../_shared/llm/speech';
 
 interface Env {
   GEMINI_API_KEY?: string;
@@ -114,6 +115,10 @@ export const onRequestPost: PagesFunction<Env> = async context => {
       // errors when that option is present, even with attempts: 1.
       const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Math.min(12_000, remaining) } });
       const voiceName = incoming.config?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName;
+      if (body.kind === 'voice' && model.startsWith('gemini-3.8-')) {
+        return generateSpeech(model, apiKey, items.flatMap(item => item.parts.map((part: { text: string }) => part.text)).join(' '),
+          ['Fenrir', 'Kore', 'Leda'].includes(voiceName) ? voiceName : 'Kore', Math.min(12_000, remaining));
+      }
       const config = body.kind === 'voice' ? {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: ['Fenrir', 'Kore', 'Leda'].includes(voiceName) ? voiceName : 'Kore' } } },

@@ -6,6 +6,11 @@ import { generateAI } from './aiTransport';
 beforeEach(() => { mocks.key.mockReturnValue(null); });
 afterEach(() => vi.unstubAllGlobals());
 describe('same-origin AI requests', () => {
+  it('upgrades saved 3.1 voice preferences to 3.8', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response('{}')); vi.stubGlobal('fetch', fetch);
+    await generateAI('voice', { model: 'gemini-3.1-flash-tts-preview', contents: { parts: [{ text: 'Morning' }] } });
+    expect(JSON.parse(fetch.mock.calls[0][1].body).request.model).toBe('gemini-3.8-flash-tts');
+  });
   it('uses the server with no personal key', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response('{"text":"result"}'));
     vi.stubGlobal('fetch', fetch);

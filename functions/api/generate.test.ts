@@ -19,6 +19,18 @@ beforeEach(() => { mocks.generate.mockReset().mockResolvedValue({ text: '{"ok":t
 afterEach(() => vi.unstubAllGlobals());
 
 describe('server AI transport', () => {
+  it('routes 3.8 voice requests through REST while preserving the browser audio contract', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ steps: [{ type: 'model_output', content: [{ type: 'audio', data: 'UklGRg==', mime_type: 'audio/wav' }] }] })));
+    vi.stubGlobal('fetch', fetch);
+    const response = await call({ kind: 'voice', apiKeys: '', request: {
+      model: 'gemini-3.8-flash-tts', contents: { parts: [{ text: 'Good morning.' }] },
+      config: { speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Leda' } } } },
+    } });
+    expect(response.status).toBe(200);
+    expect((await response.json() as any).candidates[0].content.parts[0].inlineData).toEqual({ data: 'UklGRg==', mimeType: 'audio/wav' });
+    expect(JSON.parse(fetch.mock.calls[0][1].body).generation_config.speech_config).toEqual([{ voice: 'Leda' }]);
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
   it('uses server env keys without requiring a personal key or returning credentials', async () => {
     const result = await call(body());
     expect(result.status).toBe(200);
