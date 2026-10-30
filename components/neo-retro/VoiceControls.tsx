@@ -16,6 +16,7 @@ export const VoiceControls: React.FC<Props> = ({ config, llmConfig, onChange }) 
   const generation = useRef(0);
   useEffect(() => {
     setVoices(BUILTIN_VOICES);
+    if (/^[a-z]{2,3}-/i.test(config.voiceName) && !/^(de|en)-/i.test(config.voiceName)) onChange({ ...config, voiceName: 'Kore' });
     if (!expanded) { setCatalogState('30 curated studio voices'); return; }
     const controller = new AbortController();
     fetch(`/api/voices?language=${config.language === 'en' ? 'en-US' : 'de-DE'}`, { signal: controller.signal, cache: 'no-store' }).then(async response => {
