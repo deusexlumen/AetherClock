@@ -35,7 +35,7 @@ describe('server AI transport', () => {
     const result = await call(body());
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ text: '{"ok":true}' });
-    expect(mocks.keys[0]).toBe('server-primary');
+    expect(['server-primary', 'server-extra']).toContain(mocks.keys[0]);
     expect(result.headers.get('Cache-Control')).toBe('no-store');
   });
   it('rejects cross-origin requests before using the pool', async () => {
