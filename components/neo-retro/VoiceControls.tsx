@@ -32,6 +32,14 @@ export const VoiceControls: React.FC<Props> = ({ config, llmConfig, onChange }) 
   const patch = (next: Partial<VoiceBriefingConfig>) => { stop(); setError(''); onChange({ ...config, ...next }); };
   const preview = async () => {
     if (previewState !== 'idle') { stop(); return; }
+    // Mobile browsers can require another tap after asynchronous generation.
+    // Reuse the prepared sample on that tap instead of charging for a new one.
+    if (audio.current) {
+      setError('');
+      try { await audio.current.play(); setPreviewState('playing'); }
+      catch { setError('Tap Preview voice again to allow audio playback.'); }
+      return;
+    }
     const current = ++generation.current; setError(''); setPreviewState('loading');
     try {
       const result = await generateVoiceBriefing(null, [], '', { ...config, includeAgenda: false, includeTime: false, includeWeather: false,
@@ -41,7 +49,8 @@ export const VoiceControls: React.FC<Props> = ({ config, llmConfig, onChange }) 
       const player = new Audio(audioUrl(result.audioBase64, result.mimeType)); audio.current = player;
       player.onended = () => { if (current === generation.current) setPreviewState('idle'); };
       player.onerror = () => { if (current === generation.current) { setPreviewState('idle'); setError('Playback failed. Try the preview again.'); } };
-      await player.play(); if (current === generation.current) setPreviewState('playing');
+      try { await player.play(); if (current === generation.current) setPreviewState('playing'); }
+      catch { if (current === generation.current) { setPreviewState('idle'); setError('Your sample is ready. Tap Preview voice to play it.'); } }
     } catch { if (current === generation.current) { setPreviewState('idle'); setError('Voice preview unavailable. Try again or choose another voice.'); } }
   };
   return <div className="voice-controls settings-subsection">
