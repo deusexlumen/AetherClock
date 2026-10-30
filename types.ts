@@ -83,6 +83,7 @@ export type TTSModel = 'gemini-3.8-flash-tts' | 'gemini-3.8-flash-lite-tts' | 'g
 export interface VoiceBriefingConfig {
   enabled: boolean;
   voiceName: string;
+  language?: 'de' | 'en';
   delivery?: import('./services/voiceOptions').VoiceDelivery;
   includeWeather: boolean;
   includeAgenda: boolean;

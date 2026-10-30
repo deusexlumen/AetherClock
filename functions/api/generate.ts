@@ -115,7 +115,9 @@ export const onRequestPost: PagesFunction<Env> = async context => {
       // Do not set retryOptions: SDK 1.52 turns quota responses into generic
       // errors when that option is present, even with attempts: 1.
       const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: Math.min(12_000, remaining) } });
-      const voiceName = incoming.config?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName;
+      const requestedVoice = incoming.config?.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName;
+      // Previously saved foreign catalog voices must not retain foreign accents.
+      const voiceName = typeof requestedVoice === 'string' && /^[a-z]{2,3}-/i.test(requestedVoice) && !/^(de|en)-/i.test(requestedVoice) ? 'Kore' : requestedVoice;
       if (body.kind === 'voice' && model.startsWith('gemini-3.8-')) {
         return generateSpeech(model, apiKey, items.flatMap(item => item.parts.map((part: { text: string }) => part.text)).join(' '),
           isVoiceId(voiceName) ? voiceName : 'Kore', Math.min(12_000, remaining), buildSpeechStyle(body.delivery));

@@ -18,27 +18,28 @@ export const generateVoiceBriefing = async (
   llmConfig?: LLMConfig
 ): Promise<BriefingResult> => {
   const parts: string[] = [];
+  const german = config.language !== 'en';
 
   if (config.customGreeting) {
     parts.push(config.customGreeting);
   } else {
-    parts.push("Good morning.");
+    parts.push(german ? 'Guten Morgen.' : 'Good morning.');
   }
 
   if (config.includeTime) {
-    parts.push(`It is ${alarmTime}.`);
+    parts.push(german ? `Es ist ${alarmTime} Uhr.` : `It is ${alarmTime}.`);
   }
 
   if (config.includeWeather && weather) {
     const weatherDesc = `${weather.temperature} degrees and ${WEATHER_CODES[weather.conditionCode] || 'clear'}`;
-    parts.push(`The weather: ${weatherDesc}.`);
+    parts.push(german ? `Das Wetter: ${weather.temperature} Grad.` : `The weather: ${weatherDesc}.`);
   }
 
   if (config.includeAgenda && agenda.length > 0) {
     const activeItems = agenda.filter(i => i.active).slice(0, 3);
     if (activeItems.length > 0) {
       const itemTexts = activeItems.map(i => `${i.time} ${i.title}`).join(', ');
-      parts.push(`Your upcoming appointments: ${itemTexts}.`);
+      parts.push(german ? `Deine nächsten Termine: ${itemTexts}.` : `Your upcoming appointments: ${itemTexts}.`);
     }
   }
 

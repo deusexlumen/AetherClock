@@ -11,7 +11,8 @@ describe('public prebuilt voice catalog', () => {
   });
   it('loads additional prebuilt IDs without returning custom voices or provider credentials', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ voices: [
-      { id: 'voice_arlo', display_name: 'Arlo', description: 'Confident and clear', type: 'prebuilt' },
+      { id: 'de-de-narrator', display_name: 'Narrator', language_code: 'de-DE', description: 'Speaks German', type: 'prebuilt' },
+      { id: 'ar-eg-narrator', display_name: 'Egyptian narrator', language_code: 'ar-EG', type: 'prebuilt' },
       { id: 'voice_private', display_name: 'Private persona', type: 'prompted' },
     ] })));
     vi.stubGlobal('fetch', fetch);
@@ -19,8 +20,10 @@ describe('public prebuilt voice catalog', () => {
     const response = await call({ GEMINI_API_KEY: 'secret-test-key', ALARM_DB: db });
     const text = await response.text(); const result = JSON.parse(text);
     expect(result.voices).toHaveLength(31);
-    expect(result.voices.some((voice: any) => voice.id === 'voice_arlo')).toBe(true);
+    expect(result.voices.some((voice: any) => voice.id === 'de-de-narrator')).toBe(true);
+    expect(text).not.toContain('Egyptian narrator');
     expect(text).not.toContain('Private persona'); expect(text).not.toContain('secret-test-key');
     expect(fetch.mock.calls[0][0].searchParams.get('type')).toBe('prebuilt');
+    expect(fetch.mock.calls[0][0].searchParams.get('language_code')).toBe('de-DE');
   });
 });
